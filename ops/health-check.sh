@@ -23,6 +23,13 @@ notify() {
     --data-urlencode "text=$1" > /dev/null
 }
 
+# Independent of the Telegram notify above — if Telegram itself is the thing
+# that's down, that notify() call silently fails too. Sentry's Cron Monitor
+# is a separate channel that still catches a missed or failed run either way.
+cron_checkin() {
+  [[ -n "${SENTRY_CRON_URL:-}" ]] && curl -s "${SENTRY_CRON_URL}?status=$1" > /dev/null
+}
+
 get_pid() {
   launchctl list 2>/dev/null | grep "$SERVICE_LABEL" | awk '{print $1}'
 }
@@ -66,6 +73,7 @@ done
 
 if [[ ${#ISSUES[@]} -eq 0 ]]; then
   notify "✅ ColorSense Companion daily health check: all good."
+  cron_checkin "ok"
 else
   MSG="⚠️ ColorSense Companion health check found issues:"
   for i in "${ISSUES[@]}"; do MSG="${MSG}"$'\n'"- ${i}"; done
@@ -74,4 +82,5 @@ else
     for a in "${ACTIONS[@]}"; do MSG="${MSG}"$'\n'"- ${a}"; done
   fi
   notify "$MSG"
+  cron_checkin "error"
 fi

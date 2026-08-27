@@ -59,6 +59,13 @@ and Supabase is reachable. Its only corrective action is restarting this one
 service if the process itself isn't running — everything else it finds is
 reported to the admin Telegram chat, never guessed at or patched.
 
+If `SENTRY_CRON_URL` is set in `.env`, it also checks in with Sentry's Crons
+product at the end of each run (`ok` or `error`). This is the one channel
+that's independent of Telegram — if the machine can't reach Telegram at all
+(or can't run this script in the first place, e.g. stuck at the FileVault
+lock screen after a power loss), a missed or failed check-in still shows up
+in Sentry.
+
 Install (one-time):
 ```bash
 chmod +x ops/health-check.sh
