@@ -1,6 +1,6 @@
 import { InlineKeyboard, type Bot, type Context } from "grammy";
 import { ADMIN_CHAT_ID } from "../config.js";
-import { getStatsSummary, getRecentErrorsSummary } from "../middleware/stats.js";
+import { getStatsSummary, getRecentErrorsSummary, getPopularFeaturesSummary } from "../middleware/stats.js";
 import { getCacheSize, clearCache, pingApi } from "../lib/colorsenseClient.js";
 import { testerRegistry, MAX_TESTERS } from "../lib/registry.js";
 
@@ -17,6 +17,7 @@ const ACTIONS = {
   cacheInfo: "admin:cache_info",
   cacheClear: "admin:cache_clear",
   testers: "admin:testers",
+  popular: "admin:popular",
 } as const;
 
 function isAdmin(ctx: Context): boolean {
@@ -26,6 +27,7 @@ function isAdmin(ctx: Context): boolean {
 function adminKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
     .text("View Bot Status", ACTIONS.status).row()
+    .text("Popular Features", ACTIONS.popular).row()
     .text("Tester Count", ACTIONS.testers).row()
     .text("Ping ColorSense API", ACTIONS.ping).row()
     .text("View Recent Errors", ACTIONS.errors).row()
@@ -56,6 +58,9 @@ export function registerAdminCommand(bot: Bot): void {
     switch (data) {
       case ACTIONS.status:
         await ctx.reply(getStatsSummary());
+        return;
+      case ACTIONS.popular:
+        await ctx.reply(getPopularFeaturesSummary());
         return;
       case ACTIONS.testers:
         await ctx.reply(`Testers: ${testerRegistry.count()}/${MAX_TESTERS}`);
