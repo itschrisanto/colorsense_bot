@@ -21,7 +21,10 @@ import { registerPrivacyCommand } from "./commands/privacy.js";
 import { registerNaturalLanguage } from "./commands/naturalLanguage.js";
 import { registerFallbackHandler } from "./commands/fallback.js";
 import { testerRegistry } from "./lib/registry.js";
+import { initSentry, captureError } from "./lib/sentry.js";
 import { sendAdminMessage } from "./notify.js";
+
+initSentry();
 
 const bot = new Bot(TELEGRAM_BOT_TOKEN);
 
@@ -72,6 +75,7 @@ registerFallbackHandler(bot);
 
 bot.catch((err) => {
   console.error("Unhandled bot error:", err);
+  captureError(err.error);
 });
 
 async function main(): Promise<void> {
@@ -105,5 +109,6 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   console.error("Fatal startup error:", err);
+  captureError(err);
   process.exit(1);
 });

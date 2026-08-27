@@ -49,3 +49,29 @@ launchctl kickstart -k gui/$(id -u)/com.chrisantomendez.colorsense-companion-bot
 launchctl unload ~/Library/LaunchAgents/com.chrisantomendez.colorsense-companion-bot.plist
 rm ~/Library/LaunchAgents/com.chrisantomendez.colorsense-companion-bot.plist
 ```
+
+## Daily health check
+
+`ops/health-check.sh`, scheduled via a separate launchd job, runs once a day
+(9:00 AM local time) and checks four things: the bot process is running,
+Telegram's API is reachable with our token, ColorSense's API is reachable,
+and Supabase is reachable. Its only corrective action is restarting this one
+service if the process itself isn't running — everything else it finds is
+reported to the admin Telegram chat, never guessed at or patched.
+
+Install (one-time):
+```bash
+chmod +x ops/health-check.sh
+cp deploy/com.chrisantomendez.colorsense-companion-bot.healthcheck.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.chrisantomendez.colorsense-companion-bot.healthcheck.plist
+```
+
+Run it on demand (doesn't wait for 9 AM):
+```bash
+launchctl kickstart -k gui/$(id -u)/com.chrisantomendez.colorsense-companion-bot.healthcheck
+```
+
+Check its log:
+```bash
+tail -20 ~/Library/Logs/colorsense-companion-bot/healthcheck.log
+```
