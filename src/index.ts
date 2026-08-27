@@ -38,8 +38,8 @@ bot.api.config.use(apiThrottler());
 // not shared group traffic. Registered first, ahead of everything else.
 bot.use(privateOnly);
 
-// Gates every interaction behind a first-time disclosure + "I Agree," and
-// caps public testers at MAX_TESTERS — the admin chat bypasses this entirely.
+// Gates every interaction behind a first-time disclosure + "I Agree" — the
+// admin chat bypasses this entirely.
 bot.use(consentGate);
 
 // Caps each chat's incoming request rate — protects shared CPU and the

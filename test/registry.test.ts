@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { TesterRegistry, MAX_TESTERS } from "../src/lib/registry.js";
+import { TesterRegistry } from "../src/lib/registry.js";
 
 function fakeSupabase(initialRows: { chat_id: number }[] = []) {
   const rows = [...initialRows];
@@ -24,7 +24,6 @@ describe("TesterRegistry", () => {
     const registry = new TesterRegistry(client);
     await registry.init();
     expect(registry.count()).toBe(0);
-    expect(registry.hasCapacity()).toBe(true);
   });
 
   it("loads existing testers from Supabase on init", async () => {
@@ -57,17 +56,6 @@ describe("TesterRegistry", () => {
 
     expect(registry.count()).toBe(1);
     expect(inserted).toHaveLength(1);
-  });
-
-  it("reports no capacity once MAX_TESTERS is reached", async () => {
-    const { client } = fakeSupabase([]);
-    const registry = new TesterRegistry(client);
-    await registry.init();
-
-    for (let i = 0; i < MAX_TESTERS; i++) await registry.register(i);
-
-    expect(registry.count()).toBe(MAX_TESTERS);
-    expect(registry.hasCapacity()).toBe(false);
   });
 
   it("keeps a newly registered chat in the cache even if the Supabase write fails", async () => {

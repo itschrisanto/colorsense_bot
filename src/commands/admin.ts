@@ -2,11 +2,11 @@ import { InlineKeyboard, type Bot, type Context } from "grammy";
 import { ADMIN_CHAT_ID } from "../config.js";
 import { getStatsSummary, getRecentErrorsSummary, getPopularFeaturesSummary } from "../middleware/stats.js";
 import { getCacheSize, clearCache, pingApi } from "../lib/colorsenseClient.js";
-import { testerRegistry, MAX_TESTERS } from "../lib/registry.js";
+import { testerRegistry } from "../lib/registry.js";
 import { supabase } from "../lib/supabase.js";
 
 // Admin-only, unlisted — same pattern as /status. Curated for what this bot
-// actually has to manage: no accounts, no invites — just the tester cap,
+// actually has to manage: no accounts, no invites — just tester counts,
 // the live API dependency, the palette cache, and request/error visibility.
 
 const ADMIN_TEXT = "Admin tools.";
@@ -81,7 +81,7 @@ export function registerAdminCommand(bot: Bot): void {
         await ctx.reply(await getPopularFeaturesSummary());
         return;
       case ACTIONS.testers:
-        await ctx.reply(`Testers: ${testerRegistry.count()}/${MAX_TESTERS}`);
+        await ctx.reply(`Testers: ${testerRegistry.count()}`);
         return;
       case ACTIONS.feedback:
         await ctx.reply(await getRecentFeedbackSummary());

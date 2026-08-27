@@ -2,15 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "./supabase.js";
 
 /**
- * A persisted allowlist of accepted testers, backed by Supabase so the cap
- * survives restarts and redeploys (previously a flat JSON file, which reset
- * on every deploy — the same problem that motivated moving analytics here
- * too). Loaded into memory once at startup so the consent-gate check on
- * every message stays a fast, synchronous lookup rather than a network
- * round-trip per message.
+ * A persisted registry of everyone who's agreed to the consent disclosure,
+ * backed by Supabase so it survives restarts and redeploys (previously a
+ * flat JSON file, which reset on every deploy — the same problem that
+ * motivated moving analytics here too). Loaded into memory once at startup
+ * so the consent-gate check on every message stays a fast, synchronous
+ * lookup rather than a network round-trip per message.
  */
-
-export const MAX_TESTERS = 50;
 
 export class TesterRegistry {
   private chatIds = new Set<number>();
@@ -32,10 +30,6 @@ export class TesterRegistry {
 
   count(): number {
     return this.chatIds.size;
-  }
-
-  hasCapacity(): boolean {
-    return this.chatIds.size < MAX_TESTERS;
   }
 
   async register(chatId: number): Promise<void> {
