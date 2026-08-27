@@ -1,0 +1,72 @@
+import { describe, expect, it } from "vitest";
+import { detectIntent, extractHexCodes } from "../src/commands/naturalLanguage.js";
+
+describe("extractHexCodes", () => {
+  it("finds and normalizes valid hex codes with or without #", () => {
+    expect(extractHexCodes("try #1f5313 and f4a261")).toEqual(["#1F5313", "#F4A261"]);
+  });
+
+  it("ignores invalid-length tokens", () => {
+    expect(extractHexCodes("not a color: 12345 or gggggg")).toEqual([]);
+  });
+});
+
+describe("detectIntent", () => {
+  it("detects a photo-extraction nudge", () => {
+    expect(detectIntent("can you extract colors from this photo")).toEqual({ type: "photoNudge" });
+  });
+
+  it("detects a contrast/accessibility question", () => {
+    expect(detectIntent("is this accessible enough, check the contrast")).toEqual({ type: "contrast" });
+  });
+
+  it("detects a trending request", () => {
+    expect(detectIntent("what's trending right now")).toEqual({ type: "trending" });
+  });
+
+  it("detects a search request and strips filler words", () => {
+    const intent = detectIntent("search for sunset palettes please");
+    expect(intent).toEqual({ type: "search", query: "sunset" });
+  });
+
+  it("detects a harmony request from a keyword plus one hex", () => {
+    expect(detectIntent("build me a color scheme with #1F5313")).toEqual({ type: "harmony", hex: "#1F5313" });
+  });
+
+  it("detects a health/score request from a keyword plus multiple hexes", () => {
+    const intent = detectIntent("score this palette #264653 #F4A261 #2A9D8F");
+    expect(intent).toEqual({ type: "health", hexes: ["#264653", "#F4A261", "#2A9D8F"] });
+  });
+
+  it("falls back to harmony for a single bare hex with no keyword", () => {
+    expect(detectIntent("#1F5313")).toEqual({ type: "harmony", hex: "#1F5313" });
+  });
+
+  it("falls back to health for multiple bare hexes with no keyword", () => {
+    const intent = detectIntent("#264653 #F4A261");
+    expect(intent).toEqual({ type: "health", hexes: ["#264653", "#F4A261"] });
+  });
+
+  it("returns unknown for unrelated chit-chat", () => {
+    expect(detectIntent("good morning!")).toEqual({ type: "unknown" });
+  });
+
+  it("falls back to the active palette for a health request with no hexes in the message", () => {
+    const intent = detectIntent("Can you score that palette?", ["#264653", "#F4A261"]);
+    expect(intent).toEqual({ type: "health", hexes: ["#264653", "#F4A261"] });
+  });
+
+  it("returns unknown for a health request with no hexes and no active palette", () => {
+    expect(detectIntent("Can you score that palette?")).toEqual({ type: "unknown" });
+  });
+
+  it("falls back to the active palette's first color for a harmony request with no hex", () => {
+    const intent = detectIntent("build a scheme from that", ["#1F5313", "#E9C46A"]);
+    expect(intent).toEqual({ type: "harmony", hex: "#1F5313" });
+  });
+
+  it("prefers hexes actually in the message over the active palette", () => {
+    const intent = detectIntent("score #000000 #FFFFFF", ["#264653", "#F4A261"]);
+    expect(intent).toEqual({ type: "health", hexes: ["#000000", "#FFFFFF"] });
+  });
+});

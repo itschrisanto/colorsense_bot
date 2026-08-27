@@ -10,11 +10,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@grammyjs/runner": "^2.0.3",
+    "@grammyjs/transformer-throttler": "^1.2.1",
     "dotenv": "^16.4.5",
-    "grammy": "^1.32.0"
+    "grammy": "^1.32.0",
+    "quantize": "^1.0.2",
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/quantize": "^1.0.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

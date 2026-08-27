@@ -1,0 +1,135 @@
+import type { Bot } from "grammy";
+import { isValidHex, normalizeHex } from "../lib/wcagContrast.js";
+import { promptHarmonyTypes } from "./harmony.js";
+import { runHealthCheck } from "./health.js";
+import { showBrowsePage, showSearchPage } from "./browse.js";
+import { sendContrastRedirect } from "./contrast.js";
+import { getActivePalette } from "../lib/activePalette.js";
+
+/**
+ * Free, rule-based intent routing for plain text (no slash command). Runs
+ * only for messages that didn't already match a registered command or menu
+ * button — grammy auto-passes those through to this handler, registered
+ * last. Pattern-matching, not real language understanding: it covers
+ * realistic everyday phrasing, not every possible way to phrase a request.
+ * Dispatches to the exact same functions the slash commands use, so behavior
+ * (and cost — zero AI) is identical either way.
+ *
+ * "That palette" / "this one" style follow-ups are resolved against the
+ * chat's active palette (see lib/activePalette.ts) when the message itself
+ * has no hex codes — mirrors ColorSense Lab's single shared working palette.
+ */
+
+export type Intent =
+  | { type: "photoNudge" }
+  | { type: "contrast" }
+  | { type: "trending" }
+  | { type: "search"; query: string }
+  | { type: "harmony"; hex: string }
+  | { type: "health"; hexes: string[] }
+  | { type: "unknown" };
+
+const HEX_TOKEN_RE = /#?[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
+
+export function extractHexCodes(text: string): string[] {
+  const matches = text.match(HEX_TOKEN_RE) ?? [];
+  const hexes: string[] = [];
+  for (const raw of matches) {
+    const withHash = raw.startsWith("#") ? raw : `#${raw}`;
+    if (isValidHex(withHash)) hexes.push(normalizeHex(withHash));
+  }
+  return hexes;
+}
+
+function hasAny(text: string, words: string[]): boolean {
+  return words.some((w) => text.includes(w));
+}
+
+const PHOTO_WORDS = ["photo", "picture", "image", "pic"];
+const EXTRACT_WORDS = ["extract", "pull", "grab"];
+const CONTRAST_WORDS = ["contrast", "wcag", "accessib"];
+const TRENDING_WORDS = ["trending", "what's hot", "whats hot", "popular palette"];
+const SEARCH_WORDS = ["search", "find", "looking for"];
+const HARMONY_WORDS = ["scheme", "harmony", "harmonies", "complement", "combo", "combination", "goes with", "pairs with", "pair with", "matches with"];
+const HEALTH_WORDS = ["score", "health", "rate this", "grade this", "evaluate", "how good is", "check this palette", "that palette"];
+
+const SEARCH_STOPWORDS = /\b(search|find|looking for|palettes?|colors?|for|me|please)\b/gi;
+
+/** Pure intent detection — no I/O, fully unit-testable. `activePalette` is the
+ * chat's remembered "current palette," used only as a fallback when the
+ * message itself contains no hex codes. */
+export function detectIntent(raw: string, activePalette?: string[]): Intent {
+  const lower = raw.toLowerCase();
+
+  if (hasAny(lower, PHOTO_WORDS) && hasAny(lower, EXTRACT_WORDS)) {
+    return { type: "photoNudge" };
+  }
+
+  if (hasAny(lower, CONTRAST_WORDS)) {
+    return { type: "contrast" };
+  }
+
+  if (hasAny(lower, TRENDING_WORDS)) {
+    return { type: "trending" };
+  }
+
+  if (hasAny(lower, SEARCH_WORDS)) {
+    const query = raw.replace(SEARCH_STOPWORDS, "").trim();
+    if (query) return { type: "search", query };
+  }
+
+  const hexesInText = extractHexCodes(raw);
+
+  if (hasAny(lower, HARMONY_WORDS)) {
+    const hex = hexesInText[0] ?? activePalette?.[0];
+    if (hex) return { type: "harmony", hex };
+  }
+
+  if (hasAny(lower, HEALTH_WORDS)) {
+    const hexes = hexesInText.length >= 2 ? hexesInText : activePalette;
+    if (hexes && hexes.length >= 2) return { type: "health", hexes };
+  }
+
+  // No keyword matched — fall back on hex count actually present in this
+  // message (not the remembered palette): one color reads as "build me
+  // something from this," two or more reads as "score this."
+  if (hexesInText.length === 1) {
+    return { type: "harmony", hex: hexesInText[0]! };
+  }
+  if (hexesInText.length >= 2) {
+    return { type: "health", hexes: hexesInText };
+  }
+
+  return { type: "unknown" };
+}
+
+export function registerNaturalLanguage(bot: Bot): void {
+  bot.on("message:text", async (ctx) => {
+    const activePalette = ctx.chat ? getActivePalette(ctx.chat.id) : undefined;
+    const intent = detectIntent(ctx.message.text.trim(), activePalette);
+
+    switch (intent.type) {
+      case "photoNudge":
+        await ctx.reply("Send me the photo and I'll take it from there.");
+        return;
+      case "contrast":
+        await sendContrastRedirect(ctx);
+        return;
+      case "trending":
+        await showBrowsePage(ctx, "trending", 1, false);
+        return;
+      case "search":
+        await showSearchPage(ctx, intent.query, 1, false);
+        return;
+      case "harmony":
+        await promptHarmonyTypes(ctx, intent.hex);
+        return;
+      case "health":
+        await runHealthCheck(ctx, intent.hexes);
+        return;
+      case "unknown":
+        await ctx.reply("Not sure I caught that — type /faq if you want the rundown of what I can do.");
+        return;
+    }
+  });
+}
