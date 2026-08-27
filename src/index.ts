@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import { run } from "@grammyjs/runner";
 import { apiThrottler } from "@grammyjs/transformer-throttler";
 import { TELEGRAM_BOT_TOKEN } from "./config.js";
+import { privateOnly } from "./middleware/privateOnly.js";
 import { rateLimit } from "./middleware/rateLimit.js";
 import { statsMiddleware } from "./middleware/stats.js";
 import { registerStartCommand } from "./commands/start.js";
@@ -17,6 +18,7 @@ import { registerAdminCommand } from "./commands/admin.js";
 import { registerFeedbackCommand } from "./commands/feedback.js";
 import { registerPrivacyCommand } from "./commands/privacy.js";
 import { registerNaturalLanguage } from "./commands/naturalLanguage.js";
+import { registerFallbackHandler } from "./commands/fallback.js";
 import { sendAdminMessage } from "./notify.js";
 
 const bot = new Bot(TELEGRAM_BOT_TOKEN);
@@ -26,10 +28,14 @@ const bot = new Bot(TELEGRAM_BOT_TOKEN);
 // retrying automatically instead of failing with 429s under load.
 bot.api.config.use(apiThrottler());
 
+// Keeps the bot out of groups/channels — the whole scaling design (per-chat
+// rate limiting, concurrency) assumes many independent 1:1 conversations,
+// not shared group traffic. Registered first, ahead of everything else.
+bot.use(privateOnly);
+
 // Caps each chat's incoming request rate — protects shared CPU and the
 // production ColorSense API (behind /trending, /search) from a single
-// abusive or malfunctioning client. Registered first so it can short-circuit
-// before any real work happens.
+// abusive or malfunctioning client.
 bot.use(rateLimit);
 
 // Times and tallies every request that gets past the rate limiter, by
@@ -52,6 +58,10 @@ registerPrivacyCommand(bot);
 // Registered last: only fires for text that didn't match a slash command or
 // menu button above (grammy auto-passes non-matches through).
 registerNaturalLanguage(bot);
+
+// Catches anything else (stickers, voice notes, documents, video) that fell
+// through every handler above — a graceful note instead of silence.
+registerFallbackHandler(bot);
 
 bot.catch((err) => {
   console.error("Unhandled bot error:", err);

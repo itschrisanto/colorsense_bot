@@ -2,12 +2,19 @@ import { describe, expect, it } from "vitest";
 import { detectIntent, extractHexCodes } from "../src/commands/naturalLanguage.js";
 
 describe("extractHexCodes", () => {
-  it("finds and normalizes valid hex codes with or without #", () => {
-    expect(extractHexCodes("try #1f5313 and f4a261")).toEqual(["#1F5313", "#F4A261"]);
+  it("finds and normalizes hex codes that have a leading #", () => {
+    expect(extractHexCodes("try #1f5313 and #F4A261")).toEqual(["#1F5313", "#F4A261"]);
   });
 
   it("ignores invalid-length tokens", () => {
-    expect(extractHexCodes("not a color: 12345 or gggggg")).toEqual([]);
+    expect(extractHexCodes("not a color: #12345 or #gggggg")).toEqual([]);
+  });
+
+  it("ignores bare hex-like text with no leading #, to avoid false positives on ordinary words", () => {
+    // "facade" and "deface" are valid hex digits but are plainly English words.
+    expect(extractHexCodes("that's a nice facade")).toEqual([]);
+    expect(extractHexCodes("don't deface the sign")).toEqual([]);
+    expect(extractHexCodes("f4a261")).toEqual([]);
   });
 });
 

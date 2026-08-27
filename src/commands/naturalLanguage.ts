@@ -29,14 +29,18 @@ export type Intent =
   | { type: "health"; hexes: string[] }
   | { type: "unknown" };
 
-const HEX_TOKEN_RE = /#?[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
+// Requires a leading # — a bare 6-hex-digit token (no #) is indistinguishable
+// from an ordinary English word that happens to use only a-f letters (e.g.
+// "facade", "deface"), which caused real false positives in free-text
+// messages. Slash-command argument parsing elsewhere is unaffected and still
+// accepts hex with or without # (that context is already unambiguous).
+const HEX_TOKEN_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
 
 export function extractHexCodes(text: string): string[] {
   const matches = text.match(HEX_TOKEN_RE) ?? [];
   const hexes: string[] = [];
   for (const raw of matches) {
-    const withHash = raw.startsWith("#") ? raw : `#${raw}`;
-    if (isValidHex(withHash)) hexes.push(normalizeHex(withHash));
+    if (isValidHex(raw)) hexes.push(normalizeHex(raw));
   }
   return hexes;
 }
