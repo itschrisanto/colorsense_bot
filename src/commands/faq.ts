@@ -10,7 +10,7 @@ export const FAQ_TEXT = [
   "Send me two or more colors and I'll score the palette on contrast, harmony, balance, vibrancy, and completeness, with a few thoughts on how to improve it.",
   "",
   "Send a photo",
-  "No command needed. Send me any image and I'll pull out its dominant colors, named and ready to use.",
+  "No command needed. Send me any image and I'll pull out its dominant colors, named and ready to use. Not stored anywhere — see /privacy for details.",
   "",
   "/trending",
   "A look at what's trending in the ColorSense library. Use the buttons to page through results or switch categories.",
@@ -20,6 +20,11 @@ export const FAQ_TEXT = [
   "",
   "/contrast",
   "WCAG contrast checking lives on the Pro side of ColorSense — I'll point you to the pricing page.",
+  "",
+  "/feedback",
+  "Something feel off, or have an idea? Tell me and I'll pass it along.",
+  "",
+  "You can also just talk to me normally — \"build a scheme with #1F5313\" or \"score this palette\" work too, no slash needed.",
 ].join("\n");
 
 export async function sendFaq(ctx: Context): Promise<void> {

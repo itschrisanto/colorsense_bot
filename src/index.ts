@@ -14,6 +14,8 @@ import { registerBrowseCommands } from "./commands/browse.js";
 import { registerMenu } from "./commands/menu.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerAdminCommand } from "./commands/admin.js";
+import { registerFeedbackCommand } from "./commands/feedback.js";
+import { registerPrivacyCommand } from "./commands/privacy.js";
 import { registerNaturalLanguage } from "./commands/naturalLanguage.js";
 import { sendAdminMessage } from "./notify.js";
 
@@ -44,6 +46,8 @@ registerBrowseCommands(bot);
 registerMenu(bot);
 registerStatusCommand(bot);
 registerAdminCommand(bot);
+registerFeedbackCommand(bot);
+registerPrivacyCommand(bot);
 
 // Registered last: only fires for text that didn't match a slash command or
 // menu button above (grammy auto-passes non-matches through).
@@ -64,6 +68,8 @@ async function main(): Promise<void> {
     { command: "trending", description: "Browse trending ColorSense palettes" },
     { command: "search", description: "Search the ColorSense palette library" },
     { command: "contrast", description: "WCAG contrast checking (Pro feature)" },
+    { command: "feedback", description: "Send feedback or report a problem" },
+    { command: "privacy", description: "How your data is handled" },
   ]);
 
   // run() processes updates concurrently (default up to 500 in flight) instead
