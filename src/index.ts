@@ -78,7 +78,7 @@ registerFallbackHandler(bot);
 bot.catch((err) => {
   console.error("Unhandled bot error:", err);
   captureError(err.error);
-  void sendAdminMessage(bot, `⚠️ Bot error: ${err.error}`);
+  void sendAdminMessage(bot, `Bot error: ${err.error}`);
 });
 
 async function main(): Promise<void> {
@@ -97,6 +97,7 @@ async function main(): Promise<void> {
     { command: "trending", description: "Browse trending ColorSense palettes" },
     { command: "search", description: "Search the ColorSense palette library" },
     { command: "contrast", description: "WCAG contrast checking (Pro feature)" },
+    { command: "link", description: "Connect your ColorSense account" },
     { command: "feedback", description: "Send feedback or report a problem" },
     { command: "privacy", description: "How your data is handled" },
   ]);
@@ -113,6 +114,6 @@ async function main(): Promise<void> {
 main().catch(async (err) => {
   console.error("Fatal startup error:", err);
   captureError(err);
-  await sendAdminMessage(bot, `🔴 Fatal startup error: ${err}`);
+  await sendAdminMessage(bot, `Fatal startup error: ${err}`);
   process.exit(1);
 });

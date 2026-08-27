@@ -72,10 +72,10 @@ for issue in "${ISSUES[@]:-}"; do
 done
 
 if [[ ${#ISSUES[@]} -eq 0 ]]; then
-  notify "✅ ColorSense Companion daily health check: all good."
+  notify "ColorSense Companion daily health check: all good."
   cron_checkin "ok"
 else
-  MSG="⚠️ ColorSense Companion health check found issues:"
+  MSG="ColorSense Companion health check found issues:"
   for i in "${ISSUES[@]}"; do MSG="${MSG}"$'\n'"- ${i}"; done
   if [[ ${#ACTIONS[@]} -gt 0 ]]; then
     MSG="${MSG}"$'\n\n'"Actions taken:"

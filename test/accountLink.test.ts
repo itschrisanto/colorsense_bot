@@ -74,9 +74,17 @@ describe("getPaletteFixUsage", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns the parsed usage on success", async () => {
+  it("returns the parsed usage for a capped account", async () => {
     configState.apiKey = "test-key";
-    const usage = { used: 1, limit: 2, remaining: 1 };
+    const usage = { used: 1, limit: 2, remaining: 1, unlimited: false };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse(usage)));
+
+    expect(await getPaletteFixUsage(42)).toEqual(usage);
+  });
+
+  it("returns null limit/remaining for an unlimited (Pro) account", async () => {
+    configState.apiKey = "test-key";
+    const usage = { used: 5, limit: null, remaining: null, unlimited: true };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse(usage)));
 
     expect(await getPaletteFixUsage(42)).toEqual(usage);

@@ -88,8 +88,8 @@ export function registerAdminCommand(bot: Bot): void {
         return;
       case ACTIONS.ping: {
         const result = await pingApi();
-        const icon = result.ok ? "✅" : "❌";
-        await ctx.reply(`${icon} ColorSense API — ${result.detail} (${result.latencyMs}ms)`);
+        const status = result.ok ? "OK" : "FAIL";
+        await ctx.reply(`ColorSense API — ${status}: ${result.detail} (${result.latencyMs}ms)`);
         return;
       }
       case ACTIONS.errors:

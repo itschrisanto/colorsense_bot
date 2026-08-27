@@ -10,8 +10,11 @@ import { COLORSENSE_API_BASE_URL, TELEGRAM_LINK_API_KEY } from "../config.js";
 
 export interface PaletteFixUsage {
   used: number;
-  limit: number;
-  remaining: number;
+  // null on both when the account is unlimited (Pro) — confirmed against
+  // the live API rather than assumed, so check `unlimited` first.
+  limit: number | null;
+  remaining: number | null;
+  unlimited: boolean;
 }
 
 const REQUEST_TIMEOUT_MS = 8000;
