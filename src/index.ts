@@ -20,6 +20,7 @@ import { registerFeedbackCommand } from "./commands/feedback.js";
 import { registerPrivacyCommand } from "./commands/privacy.js";
 import { registerNaturalLanguage } from "./commands/naturalLanguage.js";
 import { registerFallbackHandler } from "./commands/fallback.js";
+import { testerRegistry } from "./lib/registry.js";
 import { sendAdminMessage } from "./notify.js";
 
 const bot = new Bot(TELEGRAM_BOT_TOKEN);
@@ -74,6 +75,11 @@ bot.catch((err) => {
 });
 
 async function main(): Promise<void> {
+  // Load the tester allowlist from Supabase into memory before accepting any
+  // traffic, so the consent-gate check on every message stays a fast,
+  // synchronous lookup rather than a per-message network round-trip.
+  await testerRegistry.init();
+
   await bot.init();
 
   await bot.api.setMyCommands([

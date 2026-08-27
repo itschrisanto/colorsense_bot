@@ -1,20 +1,13 @@
 import type { Context, NextFunction } from "grammy";
+import { supabase } from "../lib/supabase.js";
 
-type CommandStats = { count: number; errors: number; totalDurationMs: number; uniqueChats: Set<number> };
 type ErrorEntry = { at: number; label: string; message: string };
+type Aggregate = { count: number; errors: number; totalDurationMs: number; uniqueChats: Set<number> };
 
 const startTime = Date.now();
-const perCommand = new Map<string, CommandStats>();
 const recentErrors: ErrorEntry[] = [];
 const MAX_RECENT_ERRORS = 10;
 
-// chatId -> last-seen timestamp. Only ever holds accepted testers (+ admin) —
-// the consent gate already filters everyone else out before reaching this
-// middleware — so this stays small (at most MAX_TESTERS + 1 entries) with no
-// need for its own eviction sweep.
-const lastSeenByChat = new Map<number, number>();
-
-const LOG_INTERVAL_MS = 30 * 60 * 1000;
 const DEFAULT_ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 
 function labelFor(ctx: Context): string {
@@ -26,12 +19,20 @@ function labelFor(ctx: Context): string {
   return "other";
 }
 
-/** Times every processed update and tallies counts/errors/latency/unique-users by command label. */
+/** Fire-and-forget — never adds Supabase network latency to a user's response. */
+function recordUsageEvent(chatId: number | undefined, label: string, durationMs: number, errored: boolean): void {
+  supabase
+    .from("usage_events")
+    .insert({ chat_id: chatId ?? null, label, duration_ms: durationMs, errored })
+    .then(({ error }) => {
+      if (error) console.error("Failed to record usage event:", error.message);
+    });
+}
+
+/** Times every processed update and records it (durably, non-blocking) by command label. */
 export async function statsMiddleware(ctx: Context, next: NextFunction): Promise<void> {
   const label = labelFor(ctx);
   const chatId = ctx.chat?.id;
-  if (chatId !== undefined) lastSeenByChat.set(chatId, Date.now());
-
   const started = Date.now();
   let errored = false;
   try {
@@ -43,30 +44,45 @@ export async function statsMiddleware(ctx: Context, next: NextFunction): Promise
     if (recentErrors.length > MAX_RECENT_ERRORS) recentErrors.shift();
     throw err;
   } finally {
-    const duration = Date.now() - started;
-    const entry = perCommand.get(label) ?? { count: 0, errors: 0, totalDurationMs: 0, uniqueChats: new Set<number>() };
+    recordUsageEvent(chatId, label, Date.now() - started, errored);
+  }
+}
+
+/** Distinct chats seen within the given window (default 5 minutes), queried live from Supabase. */
+export async function getActiveUserCount(windowMs: number = DEFAULT_ACTIVE_WINDOW_MS): Promise<number> {
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { data, error } = await supabase.from("usage_events").select("chat_id").gte("created_at", since);
+  if (error) {
+    console.error("Failed to query active users:", error.message);
+    return 0;
+  }
+  return new Set((data ?? []).map((r) => r.chat_id)).size;
+}
+
+async function aggregateByLabel(): Promise<Map<string, Aggregate>> {
+  const map = new Map<string, Aggregate>();
+  const { data, error } = await supabase.from("usage_events").select("label, chat_id, duration_ms, errored");
+  if (error) {
+    console.error("Failed to query usage events:", error.message);
+    return map;
+  }
+  for (const row of data ?? []) {
+    const entry = map.get(row.label) ?? { count: 0, errors: 0, totalDurationMs: 0, uniqueChats: new Set<number>() };
     entry.count++;
-    entry.totalDurationMs += duration;
-    if (errored) entry.errors++;
-    if (chatId !== undefined) entry.uniqueChats.add(chatId);
-    perCommand.set(label, entry);
+    entry.totalDurationMs += row.duration_ms;
+    if (row.errored) entry.errors++;
+    if (row.chat_id != null) entry.uniqueChats.add(row.chat_id);
+    map.set(row.label, entry);
   }
+  return map;
 }
 
-/** Distinct chats seen within the given window (default 5 minutes). */
-export function getActiveUserCount(windowMs: number = DEFAULT_ACTIVE_WINDOW_MS): number {
-  const now = Date.now();
-  let count = 0;
-  for (const ts of lastSeenByChat.values()) {
-    if (now - ts <= windowMs) count++;
-  }
-  return count;
-}
-
-export function getStatsSummary(): string {
+export async function getStatsSummary(): Promise<string> {
   const uptimeMin = Math.round((Date.now() - startTime) / 60_000);
-  const lines = [`Uptime: ${uptimeMin}m`, `Active now (5m): ${getActiveUserCount()}`];
-  const rows = [...perCommand.entries()].sort((a, b) => b[1].count - a[1].count);
+  const [active, byLabel] = await Promise.all([getActiveUserCount(), aggregateByLabel()]);
+
+  const lines = [`Uptime: ${uptimeMin}m`, `Active now (5m): ${active}`];
+  const rows = [...byLabel.entries()].sort((a, b) => b[1].count - a[1].count);
 
   if (rows.length === 0) {
     lines.push("No requests yet.");
@@ -82,8 +98,9 @@ export function getStatsSummary(): string {
 /** Features ranked by how many distinct people have used them — a better
  * "what's popular" signal than raw request counts, which a few chatty users
  * can skew. */
-export function getPopularFeaturesSummary(): string {
-  const rows = [...perCommand.entries()]
+export async function getPopularFeaturesSummary(): Promise<string> {
+  const byLabel = await aggregateByLabel();
+  const rows = [...byLabel.entries()]
     .filter(([, s]) => s.uniqueChats.size > 0)
     .sort((a, b) => b[1].uniqueChats.size - a[1].uniqueChats.size);
 
@@ -100,7 +117,11 @@ export function getRecentErrorsSummary(): string {
     .join("\n");
 }
 
+const LOG_INTERVAL_MS = 30 * 60 * 1000;
+
 // Passive visibility into launchd's logs without anyone needing to run /status.
 setInterval(() => {
-  console.log(`--- Stats summary ---\n${getStatsSummary()}`);
+  getStatsSummary()
+    .then((summary) => console.log(`--- Stats summary ---\n${summary}`))
+    .catch((err) => console.error("Failed to log periodic stats summary:", err));
 }, LOG_INTERVAL_MS).unref();

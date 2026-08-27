@@ -3,6 +3,7 @@ import { ADMIN_CHAT_ID } from "../config.js";
 import { getStatsSummary, getRecentErrorsSummary, getPopularFeaturesSummary } from "../middleware/stats.js";
 import { getCacheSize, clearCache, pingApi } from "../lib/colorsenseClient.js";
 import { testerRegistry, MAX_TESTERS } from "../lib/registry.js";
+import { supabase } from "../lib/supabase.js";
 
 // Admin-only, unlisted — same pattern as /status. Curated for what this bot
 // actually has to manage: no accounts, no invites — just the tester cap,
@@ -18,7 +19,23 @@ const ACTIONS = {
   cacheClear: "admin:cache_clear",
   testers: "admin:testers",
   popular: "admin:popular",
+  feedback: "admin:feedback",
 } as const;
+
+async function getRecentFeedbackSummary(): Promise<string> {
+  const { data, error } = await supabase
+    .from("feedback")
+    .select("who, message, created_at")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    console.error("Failed to query recent feedback:", error.message);
+    return "Couldn't load feedback right now.";
+  }
+  if (!data || data.length === 0) return "No feedback recorded yet.";
+  return data.map((row) => `${row.created_at} — ${row.who}: ${row.message}`).join("\n\n");
+}
 
 function isAdmin(ctx: Context): boolean {
   return ctx.chat !== undefined && String(ctx.chat.id) === ADMIN_CHAT_ID;
@@ -29,6 +46,7 @@ function adminKeyboard(): InlineKeyboard {
     .text("View Bot Status", ACTIONS.status).row()
     .text("Popular Features", ACTIONS.popular).row()
     .text("Tester Count", ACTIONS.testers).row()
+    .text("Recent Feedback", ACTIONS.feedback).row()
     .text("Ping ColorSense API", ACTIONS.ping).row()
     .text("View Recent Errors", ACTIONS.errors).row()
     .text("Cache Info", ACTIONS.cacheInfo).row()
@@ -57,13 +75,16 @@ export function registerAdminCommand(bot: Bot): void {
 
     switch (data) {
       case ACTIONS.status:
-        await ctx.reply(getStatsSummary());
+        await ctx.reply(await getStatsSummary());
         return;
       case ACTIONS.popular:
-        await ctx.reply(getPopularFeaturesSummary());
+        await ctx.reply(await getPopularFeaturesSummary());
         return;
       case ACTIONS.testers:
         await ctx.reply(`Testers: ${testerRegistry.count()}/${MAX_TESTERS}`);
+        return;
+      case ACTIONS.feedback:
+        await ctx.reply(await getRecentFeedbackSummary());
         return;
       case ACTIONS.ping: {
         const result = await pingApi();

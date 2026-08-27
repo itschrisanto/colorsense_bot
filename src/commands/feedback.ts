@@ -1,5 +1,6 @@
 import type { Bot } from "grammy";
 import { ADMIN_CHAT_ID } from "../config.js";
+import { supabase } from "../lib/supabase.js";
 
 export const OFFICIAL_CONTACT_EMAIL = "hello@colorsense.online";
 
@@ -22,6 +23,12 @@ export function registerFeedbackCommand(bot: Bot): void {
 
     try {
       await ctx.api.sendMessage(ADMIN_CHAT_ID, `Feedback from ${who} (chat ${ctx.chat?.id}):\n${message}`);
+
+      // Best-effort durable log — a Supabase hiccup shouldn't change what the
+      // user sees, since the Telegram forward above is the critical path.
+      const { error } = await supabase.from("feedback").insert({ chat_id: ctx.chat?.id ?? null, who, message });
+      if (error) console.error("Failed to persist feedback to Supabase:", error.message);
+
       await ctx.reply(
         `Got it, thanks — I'll pass this along. You can also always reach us at <a href="mailto:${OFFICIAL_CONTACT_EMAIL}">${OFFICIAL_CONTACT_EMAIL}</a>.`,
         { parse_mode: "HTML" },

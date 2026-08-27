@@ -1,58 +1,56 @@
-import fs from "node:fs";
-import path from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { supabase } from "./supabase.js";
 
 /**
- * A persisted allowlist of accepted testers, backed by a plain JSON file.
- * Deliberately not a database — 50 entries, occasional writes, needs to
- * survive restarts. A flat file is the simplest thing that actually works.
+ * A persisted allowlist of accepted testers, backed by Supabase so the cap
+ * survives restarts and redeploys (previously a flat JSON file, which reset
+ * on every deploy — the same problem that motivated moving analytics here
+ * too). Loaded into memory once at startup so the consent-gate check on
+ * every message stays a fast, synchronous lookup rather than a network
+ * round-trip per message.
  */
 
 export const MAX_TESTERS = 50;
 
-type RegistryEntry = { chatId: number; consentedAt: string };
-type RegistryData = { testers: RegistryEntry[] };
-
 export class TesterRegistry {
-  private filePath: string;
-  private data: RegistryData;
+  private chatIds = new Set<number>();
 
-  constructor(filePath: string) {
-    this.filePath = filePath;
-    this.data = this.load();
-  }
+  constructor(private client: SupabaseClient) {}
 
-  private load(): RegistryData {
-    try {
-      const raw = fs.readFileSync(this.filePath, "utf-8");
-      return JSON.parse(raw) as RegistryData;
-    } catch {
-      return { testers: [] };
+  async init(): Promise<void> {
+    const { data, error } = await this.client.from("testers").select("chat_id");
+    if (error) {
+      console.error("Failed to load tester registry from Supabase:", error.message);
+      return;
     }
-  }
-
-  private save(): void {
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
+    this.chatIds = new Set((data ?? []).map((row) => row.chat_id as number));
   }
 
   isRegistered(chatId: number): boolean {
-    return this.data.testers.some((t) => t.chatId === chatId);
+    return this.chatIds.has(chatId);
   }
 
   count(): number {
-    return this.data.testers.length;
+    return this.chatIds.size;
   }
 
   hasCapacity(): boolean {
-    return this.count() < MAX_TESTERS;
+    return this.chatIds.size < MAX_TESTERS;
   }
 
-  register(chatId: number): void {
-    if (this.isRegistered(chatId)) return;
-    this.data.testers.push({ chatId, consentedAt: new Date().toISOString() });
-    this.save();
+  async register(chatId: number): Promise<void> {
+    if (this.chatIds.has(chatId)) return;
+    // Optimistic: update the cache immediately so capacity/registration
+    // checks are consistent even if the write below is briefly in flight.
+    this.chatIds.add(chatId);
+    const { error } = await this.client.from("testers").insert({ chat_id: chatId });
+    if (error) {
+      console.error("Failed to persist new tester to Supabase:", error.message);
+      // Keep them in the in-memory cache regardless — better to let a
+      // consented tester through than to re-show the disclosure because of
+      // a transient write failure.
+    }
   }
 }
 
-const DEFAULT_PATH = path.resolve(process.cwd(), "data", "testers.json");
-export const testerRegistry = new TesterRegistry(DEFAULT_PATH);
+export const testerRegistry = new TesterRegistry(supabase);

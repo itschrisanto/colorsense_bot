@@ -1,62 +1,86 @@
-import { describe, expect, it, afterEach } from "vitest";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { TesterRegistry, MAX_TESTERS } from "../src/lib/registry.js";
 
-function tempPath(): string {
-  return path.join(os.tmpdir(), `testers-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+function fakeSupabase(initialRows: { chat_id: number }[] = []) {
+  const rows = [...initialRows];
+  const inserted: { chat_id: number }[] = [];
+  const client = {
+    from: (_table: string) => ({
+      select: async (_cols: string) => ({ data: rows, error: null }),
+      insert: async (row: { chat_id: number }) => {
+        rows.push(row);
+        inserted.push(row);
+        return { error: null };
+      },
+    }),
+  };
+  return { client: client as unknown as SupabaseClient, inserted };
 }
 
-const cleanupPaths: string[] = [];
-
-afterEach(() => {
-  for (const p of cleanupPaths.splice(0)) {
-    try {
-      fs.unlinkSync(p);
-    } catch {
-      // already gone, fine
-    }
-  }
-});
-
 describe("TesterRegistry", () => {
-  it("starts empty when no file exists yet", () => {
-    const filePath = tempPath();
-    cleanupPaths.push(filePath);
-    const registry = new TesterRegistry(filePath);
+  it("starts empty when Supabase has no rows yet", async () => {
+    const { client } = fakeSupabase([]);
+    const registry = new TesterRegistry(client);
+    await registry.init();
     expect(registry.count()).toBe(0);
     expect(registry.hasCapacity()).toBe(true);
   });
 
-  it("registers a chat and persists it to disk", () => {
-    const filePath = tempPath();
-    cleanupPaths.push(filePath);
-    const registry = new TesterRegistry(filePath);
-
-    registry.register(12345);
-    expect(registry.isRegistered(12345)).toBe(true);
-    expect(registry.count()).toBe(1);
-
-    const reloaded = new TesterRegistry(filePath);
-    expect(reloaded.isRegistered(12345)).toBe(true);
+  it("loads existing testers from Supabase on init", async () => {
+    const { client } = fakeSupabase([{ chat_id: 111 }, { chat_id: 222 }]);
+    const registry = new TesterRegistry(client);
+    await registry.init();
+    expect(registry.isRegistered(111)).toBe(true);
+    expect(registry.isRegistered(222)).toBe(true);
+    expect(registry.count()).toBe(2);
   });
 
-  it("does not double-count a chat registered twice", () => {
-    const filePath = tempPath();
-    cleanupPaths.push(filePath);
-    const registry = new TesterRegistry(filePath);
-    registry.register(1);
-    registry.register(1);
-    expect(registry.count()).toBe(1);
+  it("registers a new chat and persists it to Supabase", async () => {
+    const { client, inserted } = fakeSupabase([]);
+    const registry = new TesterRegistry(client);
+    await registry.init();
+
+    await registry.register(999);
+
+    expect(registry.isRegistered(999)).toBe(true);
+    expect(inserted).toEqual([{ chat_id: 999 }]);
   });
 
-  it("reports no capacity once MAX_TESTERS is reached", () => {
-    const filePath = tempPath();
-    cleanupPaths.push(filePath);
-    const registry = new TesterRegistry(filePath);
-    for (let i = 0; i < MAX_TESTERS; i++) registry.register(i);
+  it("does not double-insert a chat registered twice", async () => {
+    const { client, inserted } = fakeSupabase([]);
+    const registry = new TesterRegistry(client);
+    await registry.init();
+
+    await registry.register(1);
+    await registry.register(1);
+
+    expect(registry.count()).toBe(1);
+    expect(inserted).toHaveLength(1);
+  });
+
+  it("reports no capacity once MAX_TESTERS is reached", async () => {
+    const { client } = fakeSupabase([]);
+    const registry = new TesterRegistry(client);
+    await registry.init();
+
+    for (let i = 0; i < MAX_TESTERS; i++) await registry.register(i);
+
     expect(registry.count()).toBe(MAX_TESTERS);
     expect(registry.hasCapacity()).toBe(false);
+  });
+
+  it("keeps a newly registered chat in the cache even if the Supabase write fails", async () => {
+    const client = {
+      from: (_table: string) => ({
+        select: async () => ({ data: [], error: null }),
+        insert: async () => ({ error: { message: "network blip" } }),
+      }),
+    } as unknown as SupabaseClient;
+    const registry = new TesterRegistry(client);
+    await registry.init();
+
+    await registry.register(42);
+    expect(registry.isRegistered(42)).toBe(true);
   });
 });

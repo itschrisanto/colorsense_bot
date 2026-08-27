@@ -79,7 +79,7 @@ export function registerConsentHandler(bot: Bot): void {
       return;
     }
 
-    testerRegistry.register(ctx.chat.id);
+    await testerRegistry.register(ctx.chat.id);
     await sendWelcome(ctx);
   });
 }

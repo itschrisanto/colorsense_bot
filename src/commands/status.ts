@@ -7,6 +7,6 @@ import { getStatsSummary } from "../middleware/stats.js";
 export function registerStatusCommand(bot: Bot): void {
   bot.command("status", async (ctx) => {
     if (String(ctx.chat.id) !== ADMIN_CHAT_ID) return;
-    await ctx.reply(getStatsSummary());
+    await ctx.reply(await getStatsSummary());
   });
 }
