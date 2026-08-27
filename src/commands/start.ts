@@ -1,4 +1,4 @@
-import type { Bot } from "grammy";
+import type { Bot, Context } from "grammy";
 import { MAIN_MENU } from "./menu.js";
 
 const WELCOME_TEXT = [
@@ -9,8 +9,10 @@ const WELCOME_TEXT = [
   "Type /faq for the full rundown.",
 ].join("\n");
 
+export async function sendWelcome(ctx: Context): Promise<void> {
+  await ctx.reply(WELCOME_TEXT, { reply_markup: MAIN_MENU });
+}
+
 export function registerStartCommand(bot: Bot): void {
-  bot.command("start", async (ctx) => {
-    await ctx.reply(WELCOME_TEXT, { reply_markup: MAIN_MENU });
-  });
+  bot.command("start", sendWelcome);
 }

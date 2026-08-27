@@ -3,6 +3,7 @@ import { run } from "@grammyjs/runner";
 import { apiThrottler } from "@grammyjs/transformer-throttler";
 import { TELEGRAM_BOT_TOKEN } from "./config.js";
 import { privateOnly } from "./middleware/privateOnly.js";
+import { consentGate, registerConsentHandler } from "./middleware/consentGate.js";
 import { rateLimit } from "./middleware/rateLimit.js";
 import { statsMiddleware } from "./middleware/stats.js";
 import { registerStartCommand } from "./commands/start.js";
@@ -33,6 +34,10 @@ bot.api.config.use(apiThrottler());
 // not shared group traffic. Registered first, ahead of everything else.
 bot.use(privateOnly);
 
+// Gates every interaction behind a first-time disclosure + "I Agree," and
+// caps public testers at MAX_TESTERS — the admin chat bypasses this entirely.
+bot.use(consentGate);
+
 // Caps each chat's incoming request rate — protects shared CPU and the
 // production ColorSense API (behind /trending, /search) from a single
 // abusive or malfunctioning client.
@@ -54,6 +59,7 @@ registerStatusCommand(bot);
 registerAdminCommand(bot);
 registerFeedbackCommand(bot);
 registerPrivacyCommand(bot);
+registerConsentHandler(bot);
 
 // Registered last: only fires for text that didn't match a slash command or
 // menu button above (grammy auto-passes non-matches through).

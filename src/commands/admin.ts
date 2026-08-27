@@ -2,10 +2,11 @@ import { InlineKeyboard, type Bot, type Context } from "grammy";
 import { ADMIN_CHAT_ID } from "../config.js";
 import { getStatsSummary, getRecentErrorsSummary } from "../middleware/stats.js";
 import { getCacheSize, clearCache, pingApi } from "../lib/colorsenseClient.js";
+import { testerRegistry, MAX_TESTERS } from "../lib/registry.js";
 
 // Admin-only, unlisted — same pattern as /status. Curated for what this bot
-// actually has to manage: no accounts, no invites, no waitlist — just the
-// live API dependency, the palette cache, and request/error visibility.
+// actually has to manage: no accounts, no invites — just the tester cap,
+// the live API dependency, the palette cache, and request/error visibility.
 
 const ADMIN_TEXT = "Admin tools.";
 
@@ -15,6 +16,7 @@ const ACTIONS = {
   errors: "admin:errors",
   cacheInfo: "admin:cache_info",
   cacheClear: "admin:cache_clear",
+  testers: "admin:testers",
 } as const;
 
 function isAdmin(ctx: Context): boolean {
@@ -24,6 +26,7 @@ function isAdmin(ctx: Context): boolean {
 function adminKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
     .text("View Bot Status", ACTIONS.status).row()
+    .text("Tester Count", ACTIONS.testers).row()
     .text("Ping ColorSense API", ACTIONS.ping).row()
     .text("View Recent Errors", ACTIONS.errors).row()
     .text("Cache Info", ACTIONS.cacheInfo).row()
@@ -53,6 +56,9 @@ export function registerAdminCommand(bot: Bot): void {
     switch (data) {
       case ACTIONS.status:
         await ctx.reply(getStatsSummary());
+        return;
+      case ACTIONS.testers:
+        await ctx.reply(`Testers: ${testerRegistry.count()}/${MAX_TESTERS}`);
         return;
       case ACTIONS.ping: {
         const result = await pingApi();
