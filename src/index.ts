@@ -76,6 +76,7 @@ registerFallbackHandler(bot);
 bot.catch((err) => {
   console.error("Unhandled bot error:", err);
   captureError(err.error);
+  void sendAdminMessage(bot, `⚠️ Bot error: ${err.error}`);
 });
 
 async function main(): Promise<void> {
@@ -107,8 +108,9 @@ async function main(): Promise<void> {
   await sendAdminMessage(bot, `ColorSense Companion started at ${new Date().toISOString()}`);
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error("Fatal startup error:", err);
   captureError(err);
+  await sendAdminMessage(bot, `🔴 Fatal startup error: ${err}`);
   process.exit(1);
 });
