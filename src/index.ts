@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     { command: "health", description: "Score a palette's contrast and balance" },
     { command: "trending", description: "Browse trending ColorSense palettes" },
     { command: "search", description: "Search the ColorSense palette library" },
-    { command: "contrast", description: "WCAG contrast checking (Pro feature)" },
+    { command: "contrast", description: "Check WCAG contrast between two colors" },
     { command: "link", description: "Connect your ColorSense account" },
     { command: "feedback", description: "Send feedback or report a problem" },
     { command: "privacy", description: "How your data is handled" },

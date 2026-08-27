@@ -23,8 +23,22 @@ describe("detectIntent", () => {
     expect(detectIntent("can you extract colors from this photo")).toEqual({ type: "photoNudge" });
   });
 
-  it("detects a contrast/accessibility question", () => {
+  it("detects a contrast/accessibility question with no colors given", () => {
     expect(detectIntent("is this accessible enough, check the contrast")).toEqual({ type: "contrast" });
+  });
+
+  it("detects a contrast request and carries the two hexes when given", () => {
+    expect(detectIntent("check the contrast of #264653 and #F4A261")).toEqual({
+      type: "contrast",
+      hexes: ["#264653", "#F4A261"],
+    });
+  });
+
+  it("falls back to the active palette's first two colors for contrast when none are in the message", () => {
+    expect(detectIntent("check the contrast", ["#264653", "#F4A261", "#2A9D8F"])).toEqual({
+      type: "contrast",
+      hexes: ["#264653", "#F4A261"],
+    });
   });
 
   it("detects a trending request", () => {

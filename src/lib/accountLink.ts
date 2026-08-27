@@ -44,14 +44,52 @@ async function postJson(path: string, body: Record<string, unknown>): Promise<Re
   }
 }
 
+export type LinkFailureReason =
+  | "not_configured"
+  | "free_limit"
+  | "pro_limit"
+  | "already_linked_elsewhere"
+  | "invalid_code"
+  | "used_code"
+  | "expired_code"
+  | "rate_limited"
+  | "unknown";
+
+export type LinkResult = { ok: true } | { ok: false; reason: LinkFailureReason };
+
+// The API doesn't return machine-readable error codes yet — every reason
+// below except invalid/expired/rate-limited shares HTTP 409, distinguished
+// only by matching substrings in the human-readable `error` message. This
+// is fragile: if that wording ever changes, these checks silently stop
+// matching and fall through to "unknown" (still a safe, generic failure,
+// just a less specific one). Getting real error codes would need its own
+// API contract change — not worth blocking on for now.
+function classifyFailure(status: number, message: string): LinkFailureReason {
+  const lower = message.toLowerCase();
+  if (status === 409) {
+    if (lower.includes("free plan allows")) return "free_limit";
+    if (lower.includes("pro plan allows")) return "pro_limit";
+    if (lower.includes("already linked to another")) return "already_linked_elsewhere";
+    if (lower.includes("already been used")) return "used_code";
+    return "unknown";
+  }
+  if (status === 404) return "invalid_code";
+  if (status === 410) return "expired_code";
+  if (status === 429) return "rate_limited";
+  return "unknown";
+}
+
 /** Redeems a one-time linking code generated on the website, tying this
- * chat_id to whichever ColorSense account the code belongs to. Returns
- * false if linking isn't configured yet, the code is wrong/expired/used,
- * or the request itself fails. */
-export async function confirmLink(code: string, chatId: number): Promise<boolean> {
-  if (!TELEGRAM_LINK_API_KEY) return false;
+ * chat_id to whichever ColorSense account the code belongs to. */
+export async function confirmLink(code: string, chatId: number): Promise<LinkResult> {
+  if (!TELEGRAM_LINK_API_KEY) return { ok: false, reason: "not_configured" };
+
   const res = await postJson("/api/telegram/link", { code, chatId });
-  return res?.ok ?? false;
+  if (!res) return { ok: false, reason: "unknown" };
+  if (res.ok) return { ok: true };
+
+  const body = (await res.json().catch(() => null)) as { error?: string } | null;
+  return { ok: false, reason: classifyFailure(res.status, body?.error ?? "") };
 }
 
 /** Returns the linked account's real Palette Health AI fix usage, or null

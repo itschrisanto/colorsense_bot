@@ -2,8 +2,9 @@ import { InlineKeyboard, InputFile, type Bot, type Context } from "grammy";
 import { isValidHex, normalizeHex } from "../lib/wcagContrast.js";
 import { scorePalette, type HealthDimension, type PaletteHealthResult } from "../lib/paletteHealth.js";
 import { renderPaletteImage } from "../render/paletteImage.js";
-import { proFeatureMessage, proFeatureKeyboard } from "../lib/pricing.js";
+import { proFeatureKeyboard, TELEGRAM_BOT_PAGE_URL } from "../lib/pricing.js";
 import { setActivePalette } from "../lib/activePalette.js";
+import { getPaletteFixUsage } from "../lib/accountLink.js";
 
 export const HEALTH_USAGE = "Send me two or more colors and I'll score the palette — try <code>/health #264653 #F4A261 #2A9D8F</code>";
 const FIX_IT_CALLBACK = "health:fixit";
@@ -67,6 +68,35 @@ export function registerHealthCommand(bot: Bot): void {
       return;
     }
     await ctx.answerCallbackQuery();
-    await ctx.reply(proFeatureMessage("One-click color fixing"), { reply_markup: proFeatureKeyboard() });
+
+    if (!ctx.chat) return;
+    const usage = await getPaletteFixUsage(ctx.chat.id);
+    const openColorSense = new InlineKeyboard().url("Open ColorSense", "https://colorsense.online");
+
+    if (usage === null) {
+      await ctx.reply(
+        `Connect your ColorSense account to see your real fix usage — get a code at ${TELEGRAM_BOT_PAGE_URL}, then send /link CODE.`,
+      );
+      return;
+    }
+
+    if (usage.unlimited) {
+      await ctx.reply("Unlimited free fixes on your account. Head to colorsense.online to use one.", {
+        reply_markup: openColorSense,
+      });
+      return;
+    }
+
+    if ((usage.remaining ?? 0) > 0) {
+      await ctx.reply(
+        `You have ${usage.remaining} of ${usage.limit} free fixes left. Head to colorsense.online to use one.`,
+        { reply_markup: openColorSense },
+      );
+      return;
+    }
+
+    await ctx.reply(`You've used all ${usage.limit} free fixes. Upgrade to Pro for unlimited.`, {
+      reply_markup: proFeatureKeyboard(),
+    });
   });
 }

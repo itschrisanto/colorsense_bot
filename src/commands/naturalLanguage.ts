@@ -3,7 +3,7 @@ import { isValidHex, normalizeHex } from "../lib/wcagContrast.js";
 import { promptHarmonyTypes } from "./harmony.js";
 import { runHealthCheck } from "./health.js";
 import { showBrowsePage, showSearchPage } from "./browse.js";
-import { sendContrastRedirect } from "./contrast.js";
+import { runContrastCheck, sendContrastUsage } from "./contrast.js";
 import { getActivePalette } from "../lib/activePalette.js";
 
 /**
@@ -22,7 +22,7 @@ import { getActivePalette } from "../lib/activePalette.js";
 
 export type Intent =
   | { type: "photoNudge" }
-  | { type: "contrast" }
+  | { type: "contrast"; hexes?: [string, string] }
   | { type: "trending" }
   | { type: "search"; query: string }
   | { type: "harmony"; hex: string }
@@ -65,11 +65,17 @@ const SEARCH_STOPWORDS = /\b(search|find|looking for|palettes?|colors?|for|me|pl
 export function detectIntent(raw: string, activePalette?: string[]): Intent {
   const lower = raw.toLowerCase();
 
+  const hexesInText = extractHexCodes(raw);
+
   if (hasAny(lower, PHOTO_WORDS) && hasAny(lower, EXTRACT_WORDS)) {
     return { type: "photoNudge" };
   }
 
   if (hasAny(lower, CONTRAST_WORDS)) {
+    const pair = hexesInText.length >= 2 ? hexesInText : activePalette;
+    if (pair && pair.length >= 2) {
+      return { type: "contrast", hexes: [pair[0]!, pair[1]!] };
+    }
     return { type: "contrast" };
   }
 
@@ -81,8 +87,6 @@ export function detectIntent(raw: string, activePalette?: string[]): Intent {
     const query = raw.replace(SEARCH_STOPWORDS, "").trim();
     if (query) return { type: "search", query };
   }
-
-  const hexesInText = extractHexCodes(raw);
 
   if (hasAny(lower, HARMONY_WORDS)) {
     const hex = hexesInText[0] ?? activePalette?.[0];
@@ -117,7 +121,11 @@ export function registerNaturalLanguage(bot: Bot): void {
         await ctx.reply("Send me the photo and I'll take it from there.");
         return;
       case "contrast":
-        await sendContrastRedirect(ctx);
+        if (intent.hexes) {
+          await runContrastCheck(ctx, intent.hexes[0], intent.hexes[1]);
+        } else {
+          await sendContrastUsage(ctx);
+        }
         return;
       case "trending":
         await showBrowsePage(ctx, "trending", 1, false);

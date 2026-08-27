@@ -1,11 +1,8 @@
 import { InlineKeyboard } from "grammy";
 
 export const PRICING_URL = "https://colorsense.online/pricing";
-
-/** Standard reply for a bot command that maps to a paid website feature. */
-export function proFeatureMessage(featureName: string): string {
-  return `${featureName} lives on the Pro side of ColorSense.`;
-}
+export const TELEGRAM_BOT_PAGE_URL = "https://colorsense.online/telegram-bot";
+export const TELEGRAM_CONNECTIONS_URL = "https://colorsense.online/account#telegram";
 
 /** A "View Pricing" button linking out to the website's pricing page. */
 export function proFeatureKeyboard(): InlineKeyboard {

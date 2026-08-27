@@ -11,8 +11,8 @@ vi.mock("../src/config.js", () => ({
 
 const { confirmLink, getPaletteFixUsage } = await import("../src/lib/accountLink.js");
 
-function mockResponse(body: unknown, ok = true): Response {
-  return { ok, json: async () => body } as Response;
+function mockResponse(body: unknown, ok = true, status = ok ? 200 : 400): Response {
+  return { ok, status, json: async () => body } as Response;
 }
 
 describe("confirmLink", () => {
@@ -21,42 +21,51 @@ describe("confirmLink", () => {
     configState.apiKey = undefined;
   });
 
-  it("returns false without calling the API when no key is configured", async () => {
+  it("reports not_configured without calling the API when no key is set", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await confirmLink("ABC123", 42);
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ ok: false, reason: "not_configured" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("posts the code and chat id, returning true on success", async () => {
+  it("posts the code and chat id, returning ok on success", async () => {
     configState.apiKey = "test-key";
     const fetchMock = vi.fn().mockResolvedValue(mockResponse({}));
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await confirmLink("ABC123", 42);
 
-    expect(result).toBe(true);
+    expect(result).toEqual({ ok: true });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://colorsense.online/api/telegram/link");
     expect(JSON.parse(init.body)).toEqual({ code: "ABC123", chatId: 42 });
     expect(init.headers.Authorization).toBe("Bearer test-key");
   });
 
-  it("returns false when the code is rejected", async () => {
-    configState.apiKey = "test-key";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({}, false)));
-
-    expect(await confirmLink("WRONG", 42)).toBe(false);
-  });
-
-  it("returns false instead of throwing on a network failure", async () => {
+  it("returns unknown instead of throwing on a network failure", async () => {
     configState.apiKey = "test-key";
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
-    expect(await confirmLink("ABC123", 42)).toBe(false);
+    expect(await confirmLink("ABC123", 42)).toEqual({ ok: false, reason: "unknown" });
+  });
+
+  it.each([
+    [409, "Your Free plan allows 1 Telegram connection. Unlink one before adding another.", "free_limit"],
+    [409, "Your pro plan allows 5 Telegram connections. Unlink one before adding another.", "pro_limit"],
+    [409, "This Telegram account is already linked to another ColorSense account.", "already_linked_elsewhere"],
+    [409, "This code has already been used.", "used_code"],
+    [404, "Invalid code.", "invalid_code"],
+    [410, "This code has expired.", "expired_code"],
+    [429, "Too many attempts. Try again later.", "rate_limited"],
+    [409, "Something new we haven't seen before.", "unknown"],
+  ] as const)("classifies %i %s as %s", async (status, error, reason) => {
+    configState.apiKey = "test-key";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({ error }, false, status)));
+
+    expect(await confirmLink("CODE", 42)).toEqual({ ok: false, reason });
   });
 });
 
