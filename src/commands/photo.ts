@@ -1,13 +1,22 @@
-import { InputFile, type Bot } from "grammy";
+import { InlineKeyboard, InputFile, type Bot } from "grammy";
 import { TELEGRAM_BOT_TOKEN } from "../config.js";
 import { extractPalette } from "../lib/extractPalette.js";
 import { renderPaletteImage } from "../render/paletteImage.js";
 import { retry } from "../lib/retry.js";
 import { setActivePalette } from "../lib/activePalette.js";
+import { runHealthCheck } from "./health.js";
+import { promptHarmonyTypes } from "./harmony.js";
 
 const MAX_FILE_SIZE_BYTES = 15_000_000;
 const DOWNLOAD_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 500;
+const CALLBACK_PREFIX = "photo";
+
+function followUpKeyboard(hexes: string[]): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("Health Check", `${CALLBACK_PREFIX}:health:${hexes.join(",")}`)
+    .text("Build a Scheme", `${CALLBACK_PREFIX}:harmony:${hexes[0]}`);
+}
 
 async function downloadWithRetry(url: string): Promise<Buffer> {
   return retry(async () => {
@@ -54,11 +63,33 @@ export function registerPhotoHandler(bot: Bot): void {
 
       const swatchImage = await renderPaletteImage(hexes);
       await ctx.replyWithPhoto(new InputFile(swatchImage, "palette.png"), {
-        caption: "Here's what I pulled from that. Want me to score it, or build a scheme from one of these?",
+        caption: "Here's what I pulled from that.",
+        reply_markup: followUpKeyboard(hexes),
       });
     } catch (err) {
       console.error("Photo extraction failed:", err);
       await ctx.reply("That image didn't come through cleanly — try a different one?");
+    }
+  });
+
+  bot.on("callback_query:data", async (ctx, next) => {
+    const data = ctx.callbackQuery.data;
+    const [tag, action, payload] = data.split(":");
+
+    if (tag !== CALLBACK_PREFIX || !payload) {
+      await next();
+      return;
+    }
+
+    await ctx.answerCallbackQuery();
+
+    if (action === "health") {
+      await runHealthCheck(ctx, payload.split(","));
+      return;
+    }
+
+    if (action === "harmony") {
+      await promptHarmonyTypes(ctx, payload);
     }
   });
 }
