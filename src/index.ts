@@ -18,6 +18,7 @@ import { registerStatusCommand } from "./commands/status.js";
 import { registerAdminCommand } from "./commands/admin.js";
 import { registerFeedbackCommand } from "./commands/feedback.js";
 import { registerPrivacyCommand } from "./commands/privacy.js";
+import { registerLinkCommand } from "./commands/link.js";
 import { registerNaturalLanguage } from "./commands/naturalLanguage.js";
 import { registerFallbackHandler } from "./commands/fallback.js";
 import { testerRegistry } from "./lib/registry.js";
@@ -63,6 +64,7 @@ registerStatusCommand(bot);
 registerAdminCommand(bot);
 registerFeedbackCommand(bot);
 registerPrivacyCommand(bot);
+registerLinkCommand(bot);
 registerConsentHandler(bot);
 
 // Registered last: only fires for text that didn't match a slash command or

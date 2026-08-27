@@ -17,3 +17,9 @@ export const SUPABASE_SERVICE_KEY = requireEnv("SUPABASE_SERVICE_KEY");
 // Optional — real-time error alerting. Local dev works fine without it;
 // when unset, Sentry simply never initializes.
 export const SENTRY_DSN = process.env["SENTRY_DSN"];
+
+// Optional — a bot-only service credential for ColorSense's account-linking
+// and AI-usage endpoints. When unset, /link and any linked-account features
+// degrade gracefully rather than erroring — this ships before the API side
+// exists and turns on once it does.
+export const TELEGRAM_LINK_API_KEY = process.env["TELEGRAM_LINK_API_KEY"];
