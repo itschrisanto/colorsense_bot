@@ -4,6 +4,7 @@
  * website's Palette Health tool. Pure math (contrast, harmony, balance,
  * vibrancy, completeness), no AI call, self-contained.
  */
+import { hexToRgb, rgbToHsl, relativeLuminance } from "./wcagContrast.js";
 
 export type HealthDimension = {
   label: string;
@@ -21,37 +22,6 @@ export type PaletteHealthResult = {
   overall: number;
   grade: "A" | "B" | "C" | "D" | "F";
 };
-
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [
-    parseInt(h.substring(0, 2), 16),
-    parseInt(h.substring(2, 4), 16),
-    parseInt(h.substring(4, 6), 16),
-  ];
-}
-
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) return [0, 0, l];
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  let h = 0;
-  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-  else if (max === g) h = ((b - r) / d + 2) / 6;
-  else h = ((r - g) / d + 4) / 6;
-  return [h * 360, s, l];
-}
-
-function relativeLuminance(r: number, g: number, b: number): number {
-  const toLinear = (c: number) => {
-    const v = c / 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-}
 
 function contrastRatio(l1: number, l2: number): number {
   const lighter = Math.max(l1, l2);
@@ -75,7 +45,7 @@ export function scorePalette(hexColors: string[]): PaletteHealthResult {
 
   const rgbs = hexColors.map(hexToRgb);
   const hsls = rgbs.map(([r, g, b]) => rgbToHsl(r, g, b));
-  const lums = rgbs.map(([r, g, b]) => relativeLuminance(r, g, b));
+  const lums = rgbs.map(relativeLuminance);
 
   // ── Contrast ────────────────────────────────────────────────────────────────
   let maxContrast = 0;
