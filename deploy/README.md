@@ -82,3 +82,34 @@ Check its log:
 ```bash
 tail -20 ~/Library/Logs/colorsense-companion-bot/healthcheck.log
 ```
+
+## Discord bot
+
+A separate process from the Telegram bot (`dist/discord/index.js`), its own
+launchd service, its own log files — a bug in the Discord adapter can't take
+down the Telegram bot this way. Currently a trivial skeleton (`/ping` only)
+proving the deploy pipeline; real features get layered in once this is
+confirmed stable.
+
+Install (one-time):
+```bash
+cp deploy/com.chrisantomendez.colorsense-companion-bot-discord.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.chrisantomendez.colorsense-companion-bot-discord.plist
+```
+
+Shipping a change (after the usual `git pull && npm install && npm run build`):
+```bash
+launchctl kickstart -k gui/$(id -u)/com.chrisantomendez.colorsense-companion-bot-discord
+```
+
+Check its logs:
+```bash
+tail -20 ~/Library/Logs/colorsense-companion-bot/discord-stdout.log
+tail -20 ~/Library/Logs/colorsense-companion-bot/discord-stderr.log
+```
+
+Uninstalling:
+```bash
+launchctl unload ~/Library/LaunchAgents/com.chrisantomendez.colorsense-companion-bot-discord.plist
+rm ~/Library/LaunchAgents/com.chrisantomendez.colorsense-companion-bot-discord.plist
+```

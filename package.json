@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "start:discord": "node dist/discord/index.js",
     "dev": "tsc -p tsconfig.json --watch",
     "test": "vitest run"
   },
@@ -14,6 +15,7 @@
     "@grammyjs/transformer-throttler": "^1.2.1",
     "@sentry/node": "^10.71.0",
     "@supabase/supabase-js": "^2.112.4",
+    "discord.js": "^14.27.0",
     "dotenv": "^16.4.5",
     "grammy": "^1.32.0",
     "quantize": "^1.0.2",
