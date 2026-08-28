@@ -9,6 +9,7 @@ const recentErrors: ErrorEntry[] = [];
 const MAX_RECENT_ERRORS = 10;
 
 const DEFAULT_ACTIVE_WINDOW_MS = 5 * 60 * 1000;
+const EXTENDED_ACTIVE_WINDOW_MS = 30 * 60 * 1000;
 
 function labelFor(ctx: Context): string {
   const text = ctx.message?.text;
@@ -79,9 +80,13 @@ async function aggregateByLabel(): Promise<Map<string, Aggregate>> {
 
 export async function getStatsSummary(): Promise<string> {
   const uptimeMin = Math.round((Date.now() - startTime) / 60_000);
-  const [active, byLabel] = await Promise.all([getActiveUserCount(), aggregateByLabel()]);
+  const [active5m, active30m, byLabel] = await Promise.all([
+    getActiveUserCount(),
+    getActiveUserCount(EXTENDED_ACTIVE_WINDOW_MS),
+    aggregateByLabel(),
+  ]);
 
-  const lines = [`Uptime: ${uptimeMin}m`, `Active now (5m): ${active}`];
+  const lines = [`Uptime: ${uptimeMin}m`, `Active now (5m): ${active5m}`, `Active (30m): ${active30m}`];
   const rows = [...byLabel.entries()].sort((a, b) => b[1].count - a[1].count);
 
   if (rows.length === 0) {
