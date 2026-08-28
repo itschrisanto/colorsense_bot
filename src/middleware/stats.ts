@@ -20,8 +20,11 @@ function labelFor(ctx: Context): string {
   return "other";
 }
 
-/** Fire-and-forget — never adds Supabase network latency to a user's response. */
-function recordUsageEvent(chatId: number | undefined, label: string, durationMs: number, errored: boolean): void {
+/** Fire-and-forget — never adds Supabase network latency to a user's response.
+ * Exported so handlers can log their own named events (e.g. a Pro-feature
+ * mention) distinct from the generic per-message label statsMiddleware
+ * already records for every update. */
+export function recordUsageEvent(chatId: number | undefined, label: string, durationMs: number, errored: boolean): void {
   supabase
     .from("usage_events")
     .insert({ chat_id: chatId ?? null, label, duration_ms: durationMs, errored })

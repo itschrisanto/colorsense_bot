@@ -5,6 +5,8 @@ import { runHealthCheck } from "./health.js";
 import { showBrowsePage, showSearchPage } from "./browse.js";
 import { runContrastCheck, sendContrastUsage } from "./contrast.js";
 import { getActivePalette } from "../lib/activePalette.js";
+import { SVG_RECOLOR_URL } from "../lib/pricing.js";
+import { recordUsageEvent } from "../middleware/stats.js";
 
 /**
  * Free, rule-based intent routing for plain text (no slash command). Runs
@@ -27,6 +29,7 @@ export type Intent =
   | { type: "search"; query: string }
   | { type: "harmony"; hex: string }
   | { type: "health"; hexes: string[] }
+  | { type: "svgRecolor" }
   | { type: "unknown" };
 
 // Requires a leading # — a bare 6-hex-digit token (no #) is indistinguishable
@@ -52,6 +55,9 @@ function hasAny(text: string, words: string[]): boolean {
 const PHOTO_WORDS = ["photo", "picture", "image", "pic"];
 const EXTRACT_WORDS = ["extract", "pull", "grab"];
 const CONTRAST_WORDS = ["contrast", "wcag", "accessib"];
+const SVG_WORDS = ["svg", "vector"];
+const RECOLOR_WORDS = ["recolor", "re-color"];
+const RECOLOR_TARGET_WORDS = ["logo", "icon"];
 const TRENDING_WORDS = ["trending", "what's hot", "whats hot", "popular palette"];
 const SEARCH_WORDS = ["search", "find", "looking for"];
 const HARMONY_WORDS = ["scheme", "harmony", "harmonies", "complement", "combo", "combination", "goes with", "pairs with", "pair with", "matches with"];
@@ -77,6 +83,13 @@ export function detectIntent(raw: string, activePalette?: string[]): Intent {
       return { type: "contrast", hexes: [pair[0]!, pair[1]!] };
     }
     return { type: "contrast" };
+  }
+
+  // Specific enough on their own ("svg", "vector") to trigger alone;
+  // "logo"/"icon" are too generic by themselves, so those only count
+  // alongside an explicit recolor word.
+  if (hasAny(lower, SVG_WORDS) || (hasAny(lower, RECOLOR_WORDS) && hasAny(lower, RECOLOR_TARGET_WORDS))) {
+    return { type: "svgRecolor" };
   }
 
   if (hasAny(lower, TRENDING_WORDS)) {
@@ -138,6 +151,10 @@ export function registerNaturalLanguage(bot: Bot): void {
         return;
       case "health":
         await runHealthCheck(ctx, intent.hexes);
+        return;
+      case "svgRecolor":
+        recordUsageEvent(ctx.chat?.id, "svg_recolor_mention", 0, false);
+        await ctx.reply(`Recoloring an SVG to match your palette is a Pro feature — here's how it works: ${SVG_RECOLOR_URL}`);
         return;
       case "unknown":
         await ctx.reply("Not sure I caught that — type /faq if you want the rundown of what I can do.");

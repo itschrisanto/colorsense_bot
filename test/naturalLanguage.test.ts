@@ -41,6 +41,21 @@ describe("detectIntent", () => {
     });
   });
 
+  it("detects an svg-recolor mention from svg/vector words alone", () => {
+    expect(detectIntent("can you recolor my svg")).toEqual({ type: "svgRecolor" });
+    expect(detectIntent("does this work with vector files")).toEqual({ type: "svgRecolor" });
+  });
+
+  it("detects an svg-recolor mention from recolor + logo/icon", () => {
+    expect(detectIntent("recolor my logo with this palette")).toEqual({ type: "svgRecolor" });
+    expect(detectIntent("can you re-color this icon")).toEqual({ type: "svgRecolor" });
+  });
+
+  it("does not treat 'logo' or 'recolor' alone as an svg-recolor mention", () => {
+    expect(detectIntent("I need a new logo")).not.toEqual({ type: "svgRecolor" });
+    expect(detectIntent("recolor this palette for me")).not.toEqual({ type: "svgRecolor" });
+  });
+
   it("detects a trending request", () => {
     expect(detectIntent("what's trending right now")).toEqual({ type: "trending" });
   });
