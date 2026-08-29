@@ -1,5 +1,6 @@
 import type { Context, NextFunction } from "grammy";
 import { supabase } from "../lib/supabase.js";
+import { captureError } from "../lib/sentry.js";
 
 type ErrorEntry = { at: number; label: string; message: string };
 type Aggregate = { count: number; errors: number; totalDurationMs: number; uniqueChats: Set<number> };
@@ -29,7 +30,10 @@ export function recordUsageEvent(chatId: number | undefined, label: string, dura
     .from("usage_events")
     .insert({ chat_id: chatId ?? null, label, duration_ms: durationMs, errored })
     .then(({ error }) => {
-      if (error) console.error("Failed to record usage event:", error.message);
+      if (error) {
+        console.error("Failed to record usage event:", error.message);
+        captureError(new Error(`Failed to record usage event: ${error.message}`));
+      }
     });
 }
 
@@ -58,6 +62,7 @@ export async function getActiveUserCount(windowMs: number = DEFAULT_ACTIVE_WINDO
   const { data, error } = await supabase.from("usage_events").select("chat_id").gte("created_at", since);
   if (error) {
     console.error("Failed to query active users:", error.message);
+    captureError(new Error(`Failed to query active users: ${error.message}`));
     return 0;
   }
   return new Set((data ?? []).map((r) => r.chat_id)).size;
@@ -68,6 +73,7 @@ async function aggregateByLabel(): Promise<Map<string, Aggregate>> {
   const { data, error } = await supabase.from("usage_events").select("label, chat_id, duration_ms, errored");
   if (error) {
     console.error("Failed to query usage events:", error.message);
+    captureError(new Error(`Failed to query usage events: ${error.message}`));
     return map;
   }
   for (const row of data ?? []) {
@@ -131,5 +137,8 @@ const LOG_INTERVAL_MS = 30 * 60 * 1000;
 setInterval(() => {
   getStatsSummary()
     .then((summary) => console.log(`--- Stats summary ---\n${summary}`))
-    .catch((err) => console.error("Failed to log periodic stats summary:", err));
+    .catch((err) => {
+      console.error("Failed to log periodic stats summary:", err);
+      captureError(err);
+    });
 }, LOG_INTERVAL_MS).unref();
