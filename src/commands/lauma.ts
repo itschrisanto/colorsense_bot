@@ -3,6 +3,8 @@ import { TELEGRAM_LINK_API_KEY } from "../config.js";
 import { sendLaumaMessage, type LaumaResult } from "../lib/laumaChat.js";
 import { isLaumaActive, startLaumaSession, endLaumaSession, getLaumaHistory, appendLaumaTurn } from "../lib/laumaSession.js";
 import { proFeatureKeyboard, TELEGRAM_BOT_PAGE_URL } from "../lib/pricing.js";
+import { detectIntent, dispatchIntent } from "./naturalLanguage.js";
+import { getActivePalette } from "../lib/activePalette.js";
 
 const NOT_CONFIGURED_MESSAGE = "Lauma Chat isn't available yet — check back soon.";
 const WELCOME_MESSAGE =
@@ -38,6 +40,18 @@ async function handleLaumaMessage(ctx: Context, text: string): Promise<void> {
 
   if (text.length > MAX_MESSAGE_LENGTH) {
     await ctx.reply("That's a bit long for a chat message — could you shorten it?");
+    return;
+  }
+
+  // Hybrid dispatch: anything that maps to a real, already-built tool
+  // (a swatch, a contrast check, a scheme, a score) goes straight to it —
+  // same on-brand renderers /health, /harmony, etc. already use, zero
+  // Gemini cost. "unknown" and "laumaNudge" both fall through to Gemini
+  // instead: an unmatched phrase might still be a fair conversational
+  // question, and re-nudging "type /lauma" mid-conversation makes no sense.
+  const intent = detectIntent(text, getActivePalette(chatId));
+  if (intent.type !== "unknown" && intent.type !== "laumaNudge") {
+    await dispatchIntent(ctx, intent);
     return;
   }
 

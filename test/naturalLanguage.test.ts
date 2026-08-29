@@ -61,6 +61,16 @@ describe("detectIntent", () => {
     expect(detectIntent("recolor this palette for me")).not.toEqual({ type: "svgRecolor" });
   });
 
+  it("detects a sample-palette request", () => {
+    expect(detectIntent("can you give me a sample swatch")).toEqual({ type: "samplePalette" });
+    expect(detectIntent("show me a random palette")).toEqual({ type: "samplePalette" });
+  });
+
+  it("does not treat 'random' or 'sample' alone as a sample-palette request", () => {
+    expect(detectIntent("pick a random number")).not.toEqual({ type: "samplePalette" });
+    expect(detectIntent("just a sample of my work")).not.toEqual({ type: "samplePalette" });
+  });
+
   it("detects a trending request", () => {
     expect(detectIntent("what's trending right now")).toEqual({ type: "trending" });
   });

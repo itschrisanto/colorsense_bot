@@ -1,9 +1,10 @@
-import type { Bot } from "grammy";
+import type { Bot, Context } from "grammy";
 import { isValidHex, normalizeHex } from "../lib/wcagContrast.js";
 import { promptHarmonyTypes } from "./harmony.js";
 import { runHealthCheck } from "./health.js";
 import { showBrowsePage, showSearchPage } from "./browse.js";
 import { runContrastCheck, sendContrastUsage } from "./contrast.js";
+import { sendSamplePalette } from "./samplePalette.js";
 import { getActivePalette } from "../lib/activePalette.js";
 import { SVG_RECOLOR_URL } from "../lib/pricing.js";
 import { recordUsageEvent } from "../middleware/stats.js";
@@ -30,6 +31,7 @@ export type Intent =
   | { type: "search"; query: string }
   | { type: "harmony"; hex: string }
   | { type: "health"; hexes: string[] }
+  | { type: "samplePalette" }
   | { type: "svgRecolor" }
   | { type: "unknown" };
 
@@ -64,6 +66,10 @@ const CONTRAST_WORDS = ["contrast", "wcag", "accessib"];
 const SVG_WORDS = ["svg", "vector"];
 const RECOLOR_WORDS = ["recolor", "re-color"];
 const RECOLOR_TARGET_WORDS = ["logo", "icon"];
+// Requires both a "give me one" word and a palette-ish word — "random" or
+// "sample" alone are too generic to trigger on their own.
+const SAMPLE_WORDS = ["sample", "example", "random", "starter"];
+const SWATCH_WORDS = ["swatch", "palette", "colors", "color scheme"];
 const TRENDING_WORDS = ["trending", "what's hot", "whats hot", "popular palette"];
 const SEARCH_WORDS = ["search", "find", "looking for"];
 const HARMONY_WORDS = ["scheme", "harmony", "harmonies", "complement", "combo", "combination", "goes with", "pairs with", "pair with", "matches with"];
@@ -102,6 +108,10 @@ export function detectIntent(raw: string, activePalette?: string[]): Intent {
     return { type: "svgRecolor" };
   }
 
+  if (hasAny(lower, SAMPLE_WORDS) && hasAny(lower, SWATCH_WORDS)) {
+    return { type: "samplePalette" };
+  }
+
   if (hasAny(lower, TRENDING_WORDS)) {
     return { type: "trending" };
   }
@@ -134,45 +144,55 @@ export function detectIntent(raw: string, activePalette?: string[]): Intent {
   return { type: "unknown" };
 }
 
+/** Runs the actual tool behind a detected intent. Exported so an active
+ * Lauma conversation (see lauma.ts) can dispatch straight to a real tool
+ * for anything that maps to one — same on-brand output, zero Gemini cost —
+ * instead of duplicating this switch. */
+export async function dispatchIntent(ctx: Context, intent: Intent): Promise<void> {
+  switch (intent.type) {
+    case "photoNudge":
+      await ctx.reply("Send me the photo and I'll take it from there.");
+      return;
+    case "laumaNudge":
+      recordUsageEvent(ctx.chat?.id, "lauma_mention", 0, false);
+      await ctx.reply("Type /lauma to start chatting with Lauma — included with Pro, with a generous daily allowance.");
+      return;
+    case "contrast":
+      if (intent.hexes) {
+        await runContrastCheck(ctx, intent.hexes[0], intent.hexes[1]);
+      } else {
+        await sendContrastUsage(ctx);
+      }
+      return;
+    case "trending":
+      await showBrowsePage(ctx, "trending", 1, false);
+      return;
+    case "search":
+      await showSearchPage(ctx, intent.query, 1, false);
+      return;
+    case "harmony":
+      await promptHarmonyTypes(ctx, intent.hex);
+      return;
+    case "health":
+      await runHealthCheck(ctx, intent.hexes);
+      return;
+    case "samplePalette":
+      await sendSamplePalette(ctx);
+      return;
+    case "svgRecolor":
+      recordUsageEvent(ctx.chat?.id, "svg_recolor_mention", 0, false);
+      await ctx.reply(`Recoloring an SVG to match your palette is a Pro feature — here's how it works: ${SVG_RECOLOR_URL}`);
+      return;
+    case "unknown":
+      await ctx.reply("Not sure I caught that — type /faq if you want the rundown of what I can do.");
+      return;
+  }
+}
+
 export function registerNaturalLanguage(bot: Bot): void {
   bot.on("message:text", async (ctx) => {
     const activePalette = ctx.chat ? getActivePalette(ctx.chat.id) : undefined;
     const intent = detectIntent(ctx.message.text.trim(), activePalette);
-
-    switch (intent.type) {
-      case "photoNudge":
-        await ctx.reply("Send me the photo and I'll take it from there.");
-        return;
-      case "laumaNudge":
-        recordUsageEvent(ctx.chat?.id, "lauma_mention", 0, false);
-        await ctx.reply("Type /lauma to start chatting with Lauma — included with Pro, with a generous daily allowance.");
-        return;
-      case "contrast":
-        if (intent.hexes) {
-          await runContrastCheck(ctx, intent.hexes[0], intent.hexes[1]);
-        } else {
-          await sendContrastUsage(ctx);
-        }
-        return;
-      case "trending":
-        await showBrowsePage(ctx, "trending", 1, false);
-        return;
-      case "search":
-        await showSearchPage(ctx, intent.query, 1, false);
-        return;
-      case "harmony":
-        await promptHarmonyTypes(ctx, intent.hex);
-        return;
-      case "health":
-        await runHealthCheck(ctx, intent.hexes);
-        return;
-      case "svgRecolor":
-        recordUsageEvent(ctx.chat?.id, "svg_recolor_mention", 0, false);
-        await ctx.reply(`Recoloring an SVG to match your palette is a Pro feature — here's how it works: ${SVG_RECOLOR_URL}`);
-        return;
-      case "unknown":
-        await ctx.reply("Not sure I caught that — type /faq if you want the rundown of what I can do.");
-        return;
-    }
+    await dispatchIntent(ctx, intent);
   });
 }
