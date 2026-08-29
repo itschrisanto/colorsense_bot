@@ -1,14 +1,14 @@
 import { InlineKeyboard, InputFile, type Bot } from "grammy";
 import { TELEGRAM_BOT_TOKEN } from "../config.js";
 import { extractPalette } from "../lib/extractPalette.js";
-import { hexToRgb } from "../lib/wcagContrast.js";
+import { hexToRgb, evaluate } from "../lib/wcagContrast.js";
 import { nameColor } from "../lib/colorNames.js";
-import { buildContrastRows, type Entry } from "../lib/paletteHealthReport.js";
+import { buildContrastRows, verdictTone, type Entry } from "../lib/paletteHealthReport.js";
 import { renderPaletteImage } from "../render/paletteImage.js";
 import { renderContrastPairImage } from "../render/contrastPairImage.js";
 import { retry } from "../lib/retry.js";
 import { setActivePalette } from "../lib/activePalette.js";
-import { runHealthCheck } from "./health.js";
+import { runHealthCheck, FIX_IT_CALLBACK } from "./health.js";
 import { promptHarmonyTypes } from "./harmony.js";
 
 const MAX_FILE_SIZE_BYTES = 15_000_000;
@@ -122,7 +122,13 @@ export function registerPhotoHandler(bot: Bot): void {
       const fgName = nameColor(...hexToRgb(fgHex));
       const bgName = nameColor(...hexToRgb(bgHex));
       const image = await renderContrastPairImage(fgHex, fgName, bgHex, bgName);
-      await ctx.replyWithPhoto(new InputFile(image, "contrast-pair.png"));
+
+      // Only offer Fix It when there's actually something to fix — a clean
+      // AA/AAA pass gets no button, matching the honest tone everywhere
+      // else in the bot rather than pushing Pro on a result that's fine.
+      const tone = verdictTone(evaluate(fgHex, bgHex).bestGrade);
+      const reply_markup = tone === "pass" ? undefined : new InlineKeyboard().text("Fix It", FIX_IT_CALLBACK);
+      await ctx.replyWithPhoto(new InputFile(image, "contrast-pair.png"), { reply_markup });
     }
   });
 }

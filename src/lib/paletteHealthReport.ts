@@ -19,7 +19,7 @@ export type ContrastRow = {
   tone: "pass" | "warn" | "fail";
 };
 
-function verdictTone(grade: string): "pass" | "warn" | "fail" {
+export function verdictTone(grade: string): "pass" | "warn" | "fail" {
   if (grade === "AAA" || grade === "AA") return "pass";
   if (grade === "AA Large") return "warn";
   return "fail";

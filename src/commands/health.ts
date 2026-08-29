@@ -11,7 +11,10 @@ import { setActivePalette } from "../lib/activePalette.js";
 import { getPaletteFixUsage } from "../lib/accountLink.js";
 
 export const HEALTH_USAGE = "Send me two or more colors and I'll score the palette — try <code>/health #264653 #F4A261 #2A9D8F</code>";
-const FIX_IT_CALLBACK = "health:fixit";
+// Exported so other flows (e.g. a weak contrast pair from photo extraction)
+// can attach the exact same "Fix It" button and get the exact same
+// real-quota-checked handler below — one Fix It experience, not a copy.
+export const FIX_IT_CALLBACK = "health:fixit";
 
 // Deuteranopia is the most common form (~6% of men) and the website's own
 // default — the bot has no UI for picking a different type, so this one

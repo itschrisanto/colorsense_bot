@@ -10,7 +10,7 @@ export const FAQ_TEXT = [
   "Send me two or more colors and I'll score the palette on contrast, harmony, balance, vibrancy, and completeness, with a few thoughts on how to improve it.",
   "",
   "Send a photo",
-  "No command needed. Send me any image and I'll pull out its dominant colors, named and ready to use. Not stored anywhere — see /privacy for details.",
+  "No command needed. Send me any image and I'll pull out its dominant colors, named and ready to use. Not stored anywhere — see /privacy for details. From there, use the buttons to score the palette's health, build a scheme from it, or check contrast between any two of its colors.",
   "",
   "/trending",
   "A look at what's trending in the ColorSense library. Use the buttons to page through results or switch categories.",
