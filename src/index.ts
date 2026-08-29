@@ -19,6 +19,7 @@ import { registerAdminCommand } from "./commands/admin.js";
 import { registerFeedbackCommand } from "./commands/feedback.js";
 import { registerPrivacyCommand } from "./commands/privacy.js";
 import { registerLinkCommand } from "./commands/link.js";
+import { registerLaumaCommand } from "./commands/lauma.js";
 import { registerNaturalLanguage } from "./commands/naturalLanguage.js";
 import { registerFallbackHandler } from "./commands/fallback.js";
 import { testerRegistry } from "./lib/registry.js";
@@ -65,6 +66,10 @@ registerAdminCommand(bot);
 registerFeedbackCommand(bot);
 registerPrivacyCommand(bot);
 registerLinkCommand(bot);
+// Must be registered before registerNaturalLanguage — its message:text
+// handler intercepts every message for a chat in an active Lauma
+// conversation, before the rule-based intent router ever sees it.
+registerLaumaCommand(bot);
 registerConsentHandler(bot);
 
 // Registered last: only fires for text that didn't match a slash command or
@@ -98,6 +103,7 @@ async function main(): Promise<void> {
     { command: "search", description: "Search the ColorSense palette library" },
     { command: "contrast", description: "Check WCAG contrast between two colors" },
     { command: "link", description: "Connect your ColorSense account" },
+    { command: "lauma", description: "Chat with Lauma (Pro)" },
     { command: "feedback", description: "Send feedback or report a problem" },
     { command: "privacy", description: "How your data is handled" },
   ]);
