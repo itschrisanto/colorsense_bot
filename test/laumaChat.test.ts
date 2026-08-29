@@ -10,7 +10,7 @@ vi.mock("../src/config.js", () => ({
   },
 }));
 
-const { sendLaumaMessage } = await import("../src/lib/laumaChat.js");
+const { sendLaumaMessage, getLaumaChatUsage } = await import("../src/lib/laumaChat.js");
 
 function mockResponse(body: unknown, ok = true, status = ok ? 200 : 400): Response {
   return { ok, status, json: async () => body } as Response;
@@ -104,5 +104,59 @@ describe("sendLaumaMessage", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({ error: "not_linked" }, false, 404)));
 
     expect(await sendLaumaMessage(42, "hi", [])).toEqual({ ok: false, reason: "not_linked" });
+  });
+});
+
+describe("getLaumaChatUsage", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    configState.apiKey = undefined;
+  });
+
+  it("returns null without calling the API when no key is configured", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await getLaumaChatUsage(42)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("posts only chatId, with no Gemini call involved", async () => {
+    configState.apiKey = "test-key";
+    const status = {
+      tool: "lauma-chat",
+      used: 12,
+      limit: null,
+      plan: "pro",
+      resetAt: null,
+      unlimited: true,
+      allowed: true,
+      blocked: false,
+      proOnly: false,
+      dailyCap: 60,
+      dailyUsed: 12,
+      dailyResetAtUtc: "2026-08-31T00:00:00.000Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(mockResponse(status));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await getLaumaChatUsage(42)).toEqual(status);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://colorsense.online/api/ai-usage/lauma-chat");
+    expect(JSON.parse(init.body)).toEqual({ chatId: 42 });
+  });
+
+  it("returns null for an unlinked chat instead of throwing", async () => {
+    configState.apiKey = "test-key";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({ error: "not_linked" }, false, 404)));
+
+    expect(await getLaumaChatUsage(42)).toBeNull();
+  });
+
+  it("returns null instead of throwing on a network failure", async () => {
+    configState.apiKey = "test-key";
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+    expect(await getLaumaChatUsage(42)).toBeNull();
   });
 });

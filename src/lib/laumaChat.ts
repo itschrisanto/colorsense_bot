@@ -24,6 +24,25 @@ export type LaumaResult =
 // this file's sibling (accountLink.ts's 8s), so this gets its own timeout.
 const REQUEST_TIMEOUT_MS = 15000;
 
+// The status-check endpoint is a pure DB read, no Gemini call — same budget
+// as accountLink.ts's lookups, not the longer conversational timeout above.
+const STATUS_REQUEST_TIMEOUT_MS = 8000;
+
+export type LaumaUsageStatus = {
+  tool: "lauma-chat";
+  used: number;
+  limit: number | null;
+  plan: string;
+  resetAt: string | null;
+  unlimited: boolean;
+  allowed: boolean;
+  blocked: boolean;
+  proOnly: boolean;
+  dailyCap?: number;
+  dailyUsed?: number;
+  dailyResetAtUtc?: string;
+};
+
 function authHeaders(): Record<string, string> {
   return {
     Authorization: `Bearer ${TELEGRAM_LINK_API_KEY}`,
@@ -86,4 +105,34 @@ export async function sendLaumaMessage(
   }
 
   return classifyLaumaFailure(res.status, body);
+}
+
+/** Read-only status check — no Gemini call, so it's safe to call before
+ * /lauma opens a session, letting the bot gate access up front instead of
+ * only discovering a free/unlinked chat is blocked on its first message.
+ * Returns null if this chat isn't linked, linking isn't configured, or the
+ * request fails — callers should treat null as "not linked," matching
+ * accountLink.ts's getPaletteFixUsage convention. */
+export async function getLaumaChatUsage(chatId: number): Promise<LaumaUsageStatus | null> {
+  if (!TELEGRAM_LINK_API_KEY) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), STATUS_REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${COLORSENSE_API_BASE_URL}/api/ai-usage/lauma-chat`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ chatId }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    console.error("Lauma usage status request failed:", err);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!res.ok) return null;
+  return (await res.json().catch(() => null)) as LaumaUsageStatus | null;
 }

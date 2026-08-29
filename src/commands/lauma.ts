@@ -1,6 +1,6 @@
 import { InputFile, type Bot, type Context } from "grammy";
 import { TELEGRAM_LINK_API_KEY } from "../config.js";
-import { sendLaumaMessage, type LaumaResult, type LaumaTurn } from "../lib/laumaChat.js";
+import { sendLaumaMessage, getLaumaChatUsage, type LaumaResult, type LaumaUsageStatus, type LaumaTurn } from "../lib/laumaChat.js";
 import { isLaumaActive, startLaumaSession, endLaumaSession, getLaumaHistory, appendLaumaTurn } from "../lib/laumaSession.js";
 import { proFeatureKeyboard, TELEGRAM_BOT_PAGE_URL } from "../lib/pricing.js";
 import { detectIntent, dispatchIntent, extractHexCodes } from "./naturalLanguage.js";
@@ -61,6 +61,15 @@ async function sendContextualFix(ctx: Context, chatId: number, text: string, his
   setActivePalette(chatId, palette);
   const image = await renderPaletteImage(palette);
   await ctx.replyWithPhoto(new InputFile(image, "lauma-fix.png"), { caption: result.reply.slice(0, 1024) });
+}
+
+/** Projects a usage-status read onto the same failure shape sendLaumaMessage
+ * produces from a live 429, so both paths share one failureMessage — null
+ * means the account is clear to chat. */
+function statusToFailure(status: LaumaUsageStatus): Extract<LaumaResult, { ok: false }> | null {
+  if (status.allowed) return null;
+  if (!status.unlimited) return { ok: false, reason: "pro_required" };
+  return { ok: false, reason: "fair_use_cap", resetAtUtc: status.dailyResetAtUtc ?? null };
 }
 
 function failureMessage(result: Extract<LaumaResult, { ok: false }>): string {
@@ -136,6 +145,18 @@ export function registerLaumaCommand(bot: Bot): void {
       return;
     }
     if (!ctx.chat) return;
+
+    // Gated up front, not just on the first message — a free or unlinked
+    // chat gets told immediately instead of being let into a session that
+    // can only ever fail on its first real question.
+    const status = await getLaumaChatUsage(ctx.chat.id);
+    const failure = status ? statusToFailure(status) : { ok: false as const, reason: "not_linked" as const };
+
+    if (failure) {
+      const reply_markup = failure.reason === "pro_required" ? proFeatureKeyboard() : undefined;
+      await ctx.reply(failureMessage(failure), { reply_markup });
+      return;
+    }
 
     startLaumaSession(ctx.chat.id);
     await ctx.reply(WELCOME_MESSAGE);
