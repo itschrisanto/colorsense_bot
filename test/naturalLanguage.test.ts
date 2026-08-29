@@ -41,6 +41,11 @@ describe("detectIntent", () => {
     });
   });
 
+  it("detects a lauma mention and nudges toward the slash command", () => {
+    expect(detectIntent("can I talk to lauma")).toEqual({ type: "laumaNudge" });
+    expect(detectIntent("chat with Lauma")).toEqual({ type: "laumaNudge" });
+  });
+
   it("detects an svg-recolor mention from svg/vector words alone", () => {
     expect(detectIntent("can you recolor my svg")).toEqual({ type: "svgRecolor" });
     expect(detectIntent("does this work with vector files")).toEqual({ type: "svgRecolor" });

@@ -24,6 +24,7 @@ import { recordUsageEvent } from "../middleware/stats.js";
 
 export type Intent =
   | { type: "photoNudge" }
+  | { type: "laumaNudge" }
   | { type: "contrast"; hexes?: [string, string] }
   | { type: "trending" }
   | { type: "search"; query: string }
@@ -54,6 +55,11 @@ function hasAny(text: string, words: string[]): boolean {
 
 const PHOTO_WORDS = ["photo", "picture", "image", "pic"];
 const EXTRACT_WORDS = ["extract", "pull", "grab"];
+// "lauma" is a distinctive enough name to trigger alone, same reasoning as
+// SVG_WORDS below — this only points at /lauma, it never opens a session or
+// spends a Gemini call itself (that stays opt-in, see naturalLanguage's
+// module doc and lauma.ts).
+const LAUMA_WORDS = ["lauma"];
 const CONTRAST_WORDS = ["contrast", "wcag", "accessib"];
 const SVG_WORDS = ["svg", "vector"];
 const RECOLOR_WORDS = ["recolor", "re-color"];
@@ -75,6 +81,10 @@ export function detectIntent(raw: string, activePalette?: string[]): Intent {
 
   if (hasAny(lower, PHOTO_WORDS) && hasAny(lower, EXTRACT_WORDS)) {
     return { type: "photoNudge" };
+  }
+
+  if (hasAny(lower, LAUMA_WORDS)) {
+    return { type: "laumaNudge" };
   }
 
   if (hasAny(lower, CONTRAST_WORDS)) {
@@ -132,6 +142,10 @@ export function registerNaturalLanguage(bot: Bot): void {
     switch (intent.type) {
       case "photoNudge":
         await ctx.reply("Send me the photo and I'll take it from there.");
+        return;
+      case "laumaNudge":
+        recordUsageEvent(ctx.chat?.id, "lauma_mention", 0, false);
+        await ctx.reply("Type /lauma to start chatting with Lauma — included with Pro, with a generous daily allowance.");
         return;
       case "contrast":
         if (intent.hexes) {
