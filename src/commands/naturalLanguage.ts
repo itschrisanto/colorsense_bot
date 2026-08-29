@@ -75,6 +75,25 @@ const SEARCH_WORDS = ["search", "find", "looking for"];
 const HARMONY_WORDS = ["scheme", "harmony", "harmonies", "complement", "combo", "combination", "goes with", "pairs with", "pair with", "matches with"];
 const HEALTH_WORDS = ["score", "health", "rate this", "grade this", "evaluate", "how good is", "check this palette", "that palette"];
 
+// A question seeking a genuine opinion is conversation, not a command — even
+// when it happens to contain a trigger word like "combo" (see HARMONY_WORDS).
+// "What do you think of this combo, #A #B" was landing on "build a scheme
+// from #A alone", silently dropping #B and ignoring that an opinion, not a
+// new scheme, was being asked for. Falls through to "unknown": inside an
+// active Lauma session that reaches Gemini for a real take; outside one, an
+// honest "didn't catch that" beats confidently running the wrong tool.
+const OPINION_PHRASES = [
+  "what do you think",
+  "your thoughts",
+  "your take",
+  "how does this look",
+  "how do these look",
+  "do these work together",
+  "does this work together",
+  "is this good",
+  "is this a good",
+];
+
 const SEARCH_STOPWORDS = /\b(search|find|looking for|palettes?|colors?|for|me|please)\b/gi;
 
 /** Pure intent detection — no I/O, fully unit-testable. `activePalette` is the
@@ -84,6 +103,10 @@ export function detectIntent(raw: string, activePalette?: string[]): Intent {
   const lower = raw.toLowerCase();
 
   const hexesInText = extractHexCodes(raw);
+
+  if (hasAny(lower, OPINION_PHRASES)) {
+    return { type: "unknown" };
+  }
 
   if (hasAny(lower, PHOTO_WORDS) && hasAny(lower, EXTRACT_WORDS)) {
     return { type: "photoNudge" };

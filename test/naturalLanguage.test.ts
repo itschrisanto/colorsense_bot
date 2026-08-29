@@ -61,6 +61,16 @@ describe("detectIntent", () => {
     expect(detectIntent("recolor this palette for me")).not.toEqual({ type: "svgRecolor" });
   });
 
+  it("treats an opinion-seeking question as unknown rather than a harmony command", () => {
+    // Real regression: "combo" is a HARMONY_WORDS trigger, so this was
+    // landing on {type: "harmony", hex: "#784906"} — silently dropping the
+    // second color and ignoring that an opinion was being asked for, not a
+    // new scheme.
+    expect(detectIntent("What do you think of this color combo? #784906 #3D2104")).toEqual({ type: "unknown" });
+    expect(detectIntent("How does this look, #264653 and #F4A261?")).toEqual({ type: "unknown" });
+    expect(detectIntent("Do these work together, #264653 and #F4A261?")).toEqual({ type: "unknown" });
+  });
+
   it("detects a sample-palette request", () => {
     expect(detectIntent("can you give me a sample swatch")).toEqual({ type: "samplePalette" });
     expect(detectIntent("show me a random palette")).toEqual({ type: "samplePalette" });
