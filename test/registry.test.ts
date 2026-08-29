@@ -58,6 +58,27 @@ describe("TesterRegistry", () => {
     expect(inserted).toHaveLength(1);
   });
 
+  it("recovers a registration after one transient 'JWT issued at future' failure", async () => {
+    let insertCalls = 0;
+    const client = {
+      from: (_table: string) => ({
+        select: async () => ({ data: [], error: null }),
+        insert: async () => {
+          insertCalls++;
+          if (insertCalls === 1) return { error: { message: "JWT issued at future" } };
+          return { error: null };
+        },
+      }),
+    } as unknown as SupabaseClient;
+    const registry = new TesterRegistry(client);
+    await registry.init();
+
+    await registry.register(7);
+
+    expect(registry.isRegistered(7)).toBe(true);
+    expect(insertCalls).toBe(2);
+  });
+
   it("keeps a newly registered chat in the cache even if the Supabase write fails", async () => {
     const client = {
       from: (_table: string) => ({

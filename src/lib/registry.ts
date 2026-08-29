@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabase } from "./supabase.js";
+import { supabase, withTransientRetry } from "./supabase.js";
 
 /**
  * A persisted registry of everyone who's agreed to the consent disclosure,
@@ -16,7 +16,7 @@ export class TesterRegistry {
   constructor(private client: SupabaseClient) {}
 
   async init(): Promise<void> {
-    const { data, error } = await this.client.from("testers").select("chat_id");
+    const { data, error } = await withTransientRetry(() => this.client.from("testers").select("chat_id"));
     if (error) {
       console.error("Failed to load tester registry from Supabase:", error.message);
       return;
@@ -37,7 +37,7 @@ export class TesterRegistry {
     // Optimistic: update the cache immediately so capacity/registration
     // checks are consistent even if the write below is briefly in flight.
     this.chatIds.add(chatId);
-    const { error } = await this.client.from("testers").insert({ chat_id: chatId });
+    const { error } = await withTransientRetry(() => this.client.from("testers").insert({ chat_id: chatId }));
     if (error) {
       console.error("Failed to persist new tester to Supabase:", error.message);
       // Keep them in the in-memory cache regardless — better to let a

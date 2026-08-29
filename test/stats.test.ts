@@ -3,7 +3,8 @@ import type { Context } from "grammy";
 
 type EventRow = { chat_id: number | null; label: string; duration_ms: number; errored: boolean; created_at: string };
 
-vi.mock("../src/lib/supabase.js", () => {
+vi.mock("../src/lib/supabase.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/lib/supabase.js")>();
   const state: { events: EventRow[] } = { events: [] };
 
   function eventsBuilder() {
@@ -33,6 +34,7 @@ vi.mock("../src/lib/supabase.js", () => {
   }
 
   return {
+    ...actual,
     supabase: {
       from: (table: string) => {
         if (table === "usage_events") return eventsBuilder();

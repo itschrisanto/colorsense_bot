@@ -1,5 +1,5 @@
 import type { Context, NextFunction } from "grammy";
-import { supabase } from "../lib/supabase.js";
+import { supabase, withTransientRetry } from "../lib/supabase.js";
 import { captureError } from "../lib/sentry.js";
 
 type ErrorEntry = { at: number; label: string; message: string };
@@ -26,15 +26,14 @@ function labelFor(ctx: Context): string {
  * mention) distinct from the generic per-message label statsMiddleware
  * already records for every update. */
 export function recordUsageEvent(chatId: number | undefined, label: string, durationMs: number, errored: boolean): void {
-  supabase
-    .from("usage_events")
-    .insert({ chat_id: chatId ?? null, label, duration_ms: durationMs, errored })
-    .then(({ error }) => {
-      if (error) {
-        console.error("Failed to record usage event:", error.message);
-        captureError(new Error(`Failed to record usage event: ${error.message}`));
-      }
-    });
+  withTransientRetry(() =>
+    supabase.from("usage_events").insert({ chat_id: chatId ?? null, label, duration_ms: durationMs, errored }),
+  ).then(({ error }) => {
+    if (error) {
+      console.error("Failed to record usage event:", error.message);
+      captureError(new Error(`Failed to record usage event: ${error.message}`));
+    }
+  });
 }
 
 /** Times every processed update and records it (durably, non-blocking) by command label. */
@@ -59,7 +58,9 @@ export async function statsMiddleware(ctx: Context, next: NextFunction): Promise
 /** Distinct chats seen within the given window (default 5 minutes), queried live from Supabase. */
 export async function getActiveUserCount(windowMs: number = DEFAULT_ACTIVE_WINDOW_MS): Promise<number> {
   const since = new Date(Date.now() - windowMs).toISOString();
-  const { data, error } = await supabase.from("usage_events").select("chat_id").gte("created_at", since);
+  const { data, error } = await withTransientRetry(() =>
+    supabase.from("usage_events").select("chat_id").gte("created_at", since),
+  );
   if (error) {
     console.error("Failed to query active users:", error.message);
     captureError(new Error(`Failed to query active users: ${error.message}`));
@@ -70,7 +71,9 @@ export async function getActiveUserCount(windowMs: number = DEFAULT_ACTIVE_WINDO
 
 async function aggregateByLabel(): Promise<Map<string, Aggregate>> {
   const map = new Map<string, Aggregate>();
-  const { data, error } = await supabase.from("usage_events").select("label, chat_id, duration_ms, errored");
+  const { data, error } = await withTransientRetry(() =>
+    supabase.from("usage_events").select("label, chat_id, duration_ms, errored"),
+  );
   if (error) {
     console.error("Failed to query usage events:", error.message);
     captureError(new Error(`Failed to query usage events: ${error.message}`));

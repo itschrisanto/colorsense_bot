@@ -3,7 +3,7 @@ import { ADMIN_CHAT_ID } from "../config.js";
 import { getStatsSummary, getRecentErrorsSummary, getPopularFeaturesSummary } from "../middleware/stats.js";
 import { getCacheSize, clearCache, pingApi } from "../lib/colorsenseClient.js";
 import { testerRegistry } from "../lib/registry.js";
-import { supabase } from "../lib/supabase.js";
+import { supabase, withTransientRetry } from "../lib/supabase.js";
 
 // Admin-only, unlisted — same pattern as /status. Curated for what this bot
 // actually has to manage: no accounts, no invites — just tester counts,
@@ -23,11 +23,9 @@ const ACTIONS = {
 } as const;
 
 async function getRecentFeedbackSummary(): Promise<string> {
-  const { data, error } = await supabase
-    .from("feedback")
-    .select("who, message, created_at")
-    .order("created_at", { ascending: false })
-    .limit(10);
+  const { data, error } = await withTransientRetry(() =>
+    supabase.from("feedback").select("who, message, created_at").order("created_at", { ascending: false }).limit(10),
+  );
 
   if (error) {
     console.error("Failed to query recent feedback:", error.message);
