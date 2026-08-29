@@ -1,7 +1,11 @@
 import { InlineKeyboard, InputFile, type Bot } from "grammy";
 import { TELEGRAM_BOT_TOKEN } from "../config.js";
 import { extractPalette } from "../lib/extractPalette.js";
+import { hexToRgb } from "../lib/wcagContrast.js";
+import { nameColor } from "../lib/colorNames.js";
+import { buildContrastRows, type Entry } from "../lib/paletteHealthReport.js";
 import { renderPaletteImage } from "../render/paletteImage.js";
+import { renderContrastPairImage } from "../render/contrastPairImage.js";
 import { retry } from "../lib/retry.js";
 import { setActivePalette } from "../lib/activePalette.js";
 import { runHealthCheck } from "./health.js";
@@ -15,7 +19,20 @@ const CALLBACK_PREFIX = "photo";
 function followUpKeyboard(hexes: string[]): InlineKeyboard {
   return new InlineKeyboard()
     .text("Health Check", `${CALLBACK_PREFIX}:health:${hexes.join(",")}`)
-    .text("Build a Scheme", `${CALLBACK_PREFIX}:harmony:${hexes[0]}`);
+    .text("Build a Scheme", `${CALLBACK_PREFIX}:harmony:${hexes[0]}`)
+    .row()
+    .text("Contrast", `${CALLBACK_PREFIX}:contrastmenu:${hexes.join(",")}`);
+}
+
+function contrastPairKeyboard(hexes: string[]): InlineKeyboard {
+  const entries: Entry[] = hexes.map((hex) => ({ hex, name: nameColor(...hexToRgb(hex)) }));
+  const rows = buildContrastRows(entries);
+  const kb = new InlineKeyboard();
+  rows.forEach((row, i) => {
+    kb.text(`${row.fg} × ${row.bg}`, `${CALLBACK_PREFIX}:contrastpair:${row.fg},${row.bg}`);
+    if (i % 2 === 1) kb.row();
+  });
+  return kb;
 }
 
 async function downloadWithRetry(url: string): Promise<Buffer> {
@@ -90,6 +107,22 @@ export function registerPhotoHandler(bot: Bot): void {
 
     if (action === "harmony") {
       await promptHarmonyTypes(ctx, payload);
+      return;
+    }
+
+    if (action === "contrastmenu") {
+      const hexes = payload.split(",");
+      await ctx.reply("Pick a pair to check:", { reply_markup: contrastPairKeyboard(hexes) });
+      return;
+    }
+
+    if (action === "contrastpair") {
+      const [fgHex, bgHex] = payload.split(",");
+      if (!fgHex || !bgHex) return;
+      const fgName = nameColor(...hexToRgb(fgHex));
+      const bgName = nameColor(...hexToRgb(bgHex));
+      const image = await renderContrastPairImage(fgHex, fgName, bgHex, bgName);
+      await ctx.replyWithPhoto(new InputFile(image, "contrast-pair.png"));
     }
   });
 }
