@@ -1,42 +1,30 @@
 import { Keyboard, type Bot } from "grammy";
-import { showBrowsePage, SEARCH_USAGE } from "./browse.js";
 import { sendFaq } from "./faq.js";
-import { promptColorPresets } from "./harmony.js";
-import { HEALTH_USAGE } from "./health.js";
+import { sendWaitlistPrompt } from "../lib/waitlist.js";
 
 export const MENU_LABELS = {
-  harmony: "Build a Color Scheme",
-  health: "Score a Palette",
-  trending: "Browse Trending",
-  search: "Search Palettes",
   photo: "Extract from Photo",
   faq: "How to Use",
 } as const;
 
+// Buttons from the pre-iOS-app six-button menu. No longer sent to anyone,
+// but a Telegram client that already rendered the old keyboard can keep
+// showing it until the user's next /start — these keep an old tap from
+// falling through to natural-language routing with a confusing result.
+const RETIRED_LABELS = ["Build a Color Scheme", "Score a Palette", "Browse Trending", "Search Palettes"];
+
 export const MAIN_MENU = new Keyboard()
-  .text(MENU_LABELS.harmony).text(MENU_LABELS.health).row()
-  .text(MENU_LABELS.trending).text(MENU_LABELS.search).row()
   .text(MENU_LABELS.photo).text(MENU_LABELS.faq)
   .resized();
 
 export function registerMenu(bot: Bot): void {
-  bot.hears(MENU_LABELS.harmony, promptColorPresets);
-
-  bot.hears(MENU_LABELS.health, async (ctx) => {
-    await ctx.reply(HEALTH_USAGE, { parse_mode: "HTML" });
-  });
-
-  bot.hears(MENU_LABELS.search, async (ctx) => {
-    await ctx.reply(SEARCH_USAGE, { parse_mode: "HTML" });
-  });
-
   bot.hears(MENU_LABELS.photo, async (ctx) => {
     await ctx.reply("Send me a photo and I'll pull the colors out of it.");
   });
 
-  bot.hears(MENU_LABELS.trending, async (ctx) => {
-    await showBrowsePage(ctx, "trending", 1, false);
-  });
-
   bot.hears(MENU_LABELS.faq, sendFaq);
+
+  bot.hears(RETIRED_LABELS, async (ctx) => {
+    await sendWaitlistPrompt(ctx, "menu_button");
+  });
 }

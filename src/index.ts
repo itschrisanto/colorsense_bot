@@ -7,19 +7,14 @@ import { consentGate, registerConsentHandler } from "./middleware/consentGate.js
 import { rateLimit } from "./middleware/rateLimit.js";
 import { statsMiddleware } from "./middleware/stats.js";
 import { registerStartCommand } from "./commands/start.js";
-import { registerContrastCommand } from "./commands/contrast.js";
 import { registerPhotoHandler } from "./commands/photo.js";
-import { registerHarmonyCommand } from "./commands/harmony.js";
-import { registerHealthCommand } from "./commands/health.js";
 import { registerFaqCommand } from "./commands/faq.js";
-import { registerBrowseCommands } from "./commands/browse.js";
 import { registerMenu } from "./commands/menu.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerAdminCommand } from "./commands/admin.js";
 import { registerFeedbackCommand } from "./commands/feedback.js";
 import { registerPrivacyCommand } from "./commands/privacy.js";
-import { registerLinkCommand } from "./commands/link.js";
-import { registerLaumaCommand } from "./commands/lauma.js";
+import { registerGatedCommands } from "./commands/gated.js";
 import { registerNaturalLanguage } from "./commands/naturalLanguage.js";
 import { registerFallbackHandler } from "./commands/fallback.js";
 import { testerRegistry } from "./lib/registry.js";
@@ -54,22 +49,16 @@ bot.use(rateLimit);
 bot.use(statsMiddleware);
 
 registerStartCommand(bot);
-registerContrastCommand(bot);
 registerPhotoHandler(bot);
-registerHarmonyCommand(bot);
-registerHealthCommand(bot);
 registerFaqCommand(bot);
-registerBrowseCommands(bot);
 registerMenu(bot);
 registerStatusCommand(bot);
 registerAdminCommand(bot);
 registerFeedbackCommand(bot);
 registerPrivacyCommand(bot);
-registerLinkCommand(bot);
-// Must be registered before registerNaturalLanguage — its message:text
-// handler intercepts every message for a chat in an active Lauma
-// conversation, before the rule-based intent router ever sees it.
-registerLaumaCommand(bot);
+// Catches /harmony, /health, /contrast, /trending, /search, /link, /lauma,
+// /endlauma — retired in favor of the ColorSense iOS app; see gated.ts.
+registerGatedCommands(bot);
 registerConsentHandler(bot);
 
 // Registered last: only fires for text that didn't match a slash command or
@@ -97,13 +86,6 @@ async function main(): Promise<void> {
   await bot.api.setMyCommands([
     { command: "start", description: "Start or reopen ColorSense Companion" },
     { command: "faq", description: "How to use ColorSense Companion" },
-    { command: "harmony", description: "Build a color scheme from a base color" },
-    { command: "health", description: "Score a palette's contrast and balance" },
-    { command: "trending", description: "Browse trending ColorSense palettes" },
-    { command: "search", description: "Search the ColorSense palette library" },
-    { command: "contrast", description: "Check WCAG contrast between two colors" },
-    { command: "link", description: "Connect your ColorSense account" },
-    { command: "lauma", description: "Chat with Lauma (Pro)" },
     { command: "feedback", description: "Send feedback or report a problem" },
     { command: "privacy", description: "How your data is handled" },
   ]);

@@ -1,13 +1,7 @@
 import type { Bot, Context } from "grammy";
 import { isValidHex, normalizeHex } from "../lib/wcagContrast.js";
-import { promptHarmonyTypes } from "./harmony.js";
-import { runHealthCheck } from "./health.js";
-import { showBrowsePage, showSearchPage } from "./browse.js";
-import { runContrastCheck, sendContrastUsage } from "./contrast.js";
-import { sendSamplePalette } from "./samplePalette.js";
 import { getActivePalette } from "../lib/activePalette.js";
-import { SVG_RECOLOR_URL } from "../lib/pricing.js";
-import { recordUsageEvent } from "../middleware/stats.js";
+import { sendWaitlistPrompt } from "../lib/waitlist.js";
 
 /**
  * Free, rule-based intent routing for plain text (no slash command). Runs
@@ -177,34 +171,28 @@ export async function dispatchIntent(ctx: Context, intent: Intent): Promise<void
       await ctx.reply("Send me the photo and I'll take it from there.");
       return;
     case "laumaNudge":
-      recordUsageEvent(ctx.chat?.id, "lauma_mention", 0, false);
-      await ctx.reply("Type /lauma to start chatting with Lauma — included with Pro, with a generous daily allowance.");
+      await sendWaitlistPrompt(ctx, "lauma_mention");
       return;
     case "contrast":
-      if (intent.hexes) {
-        await runContrastCheck(ctx, intent.hexes[0], intent.hexes[1]);
-      } else {
-        await sendContrastUsage(ctx);
-      }
+      await sendWaitlistPrompt(ctx, "contrast");
       return;
     case "trending":
-      await showBrowsePage(ctx, "trending", 1, false);
+      await sendWaitlistPrompt(ctx, "trending");
       return;
     case "search":
-      await showSearchPage(ctx, intent.query, 1, false);
+      await sendWaitlistPrompt(ctx, "search");
       return;
     case "harmony":
-      await promptHarmonyTypes(ctx, intent.hex);
+      await sendWaitlistPrompt(ctx, "harmony");
       return;
     case "health":
-      await runHealthCheck(ctx, intent.hexes);
+      await sendWaitlistPrompt(ctx, "health");
       return;
     case "samplePalette":
-      await sendSamplePalette(ctx);
+      await sendWaitlistPrompt(ctx, "sample_palette");
       return;
     case "svgRecolor":
-      recordUsageEvent(ctx.chat?.id, "svg_recolor_mention", 0, false);
-      await ctx.reply(`Recoloring an SVG to match your palette is a Pro feature — here's how it works: ${SVG_RECOLOR_URL}`);
+      await sendWaitlistPrompt(ctx, "svg_recolor_mention");
       return;
     case "unknown":
       await ctx.reply("Not sure I caught that — type /faq if you want the rundown of what I can do.");

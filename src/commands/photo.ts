@@ -1,39 +1,18 @@
-import { InlineKeyboard, InputFile, type Bot } from "grammy";
+import { InputFile, type Bot } from "grammy";
 import { TELEGRAM_BOT_TOKEN } from "../config.js";
 import { extractPalette } from "../lib/extractPalette.js";
-import { hexToRgb, evaluate } from "../lib/wcagContrast.js";
-import { nameColor } from "../lib/colorNames.js";
-import { buildContrastRows, verdictTone, type Entry } from "../lib/paletteHealthReport.js";
 import { renderPaletteImage } from "../render/paletteImage.js";
-import { renderContrastPairImage } from "../render/contrastPairImage.js";
 import { retry } from "../lib/retry.js";
 import { setActivePalette } from "../lib/activePalette.js";
-import { runHealthCheck, FIX_IT_CALLBACK } from "./health.js";
-import { promptHarmonyTypes } from "./harmony.js";
+import { sendWaitlistPrompt, waitlistKeyboard } from "../lib/waitlist.js";
 
 const MAX_FILE_SIZE_BYTES = 15_000_000;
 const DOWNLOAD_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 500;
+// Only still checked for on inbound callback_query taps — see the handler
+// below, kept as a graceful landing spot for buttons Telegram already
+// delivered to users before the iOS-app pivot.
 const CALLBACK_PREFIX = "photo";
-
-function followUpKeyboard(hexes: string[]): InlineKeyboard {
-  return new InlineKeyboard()
-    .text("Health Check", `${CALLBACK_PREFIX}:health:${hexes.join(",")}`)
-    .text("Build a Scheme", `${CALLBACK_PREFIX}:harmony:${hexes[0]}`)
-    .row()
-    .text("Contrast", `${CALLBACK_PREFIX}:contrastmenu:${hexes.join(",")}`);
-}
-
-function contrastPairKeyboard(hexes: string[]): InlineKeyboard {
-  const entries: Entry[] = hexes.map((hex) => ({ hex, name: nameColor(...hexToRgb(hex)) }));
-  const rows = buildContrastRows(entries);
-  const kb = new InlineKeyboard();
-  rows.forEach((row, i) => {
-    kb.text(`${row.fg} × ${row.bg}`, `${CALLBACK_PREFIX}:contrastpair:${row.fg},${row.bg}`);
-    if (i % 2 === 1) kb.row();
-  });
-  return kb;
-}
 
 async function downloadWithRetry(url: string): Promise<Buffer> {
   return retry(async () => {
@@ -80,8 +59,9 @@ export function registerPhotoHandler(bot: Bot): void {
 
       const swatchImage = await renderPaletteImage(hexes);
       await ctx.replyWithPhoto(new InputFile(swatchImage, "palette.png"), {
-        caption: "Here's what I pulled from that.",
-        reply_markup: followUpKeyboard(hexes),
+        caption:
+          "Here's what I pulled from that. Schemes, contrast checks, and more are moving to the ColorSense iOS app.",
+        reply_markup: waitlistKeyboard(),
       });
     } catch (err) {
       console.error("Photo extraction failed:", err);
@@ -89,46 +69,18 @@ export function registerPhotoHandler(bot: Bot): void {
     }
   });
 
+  // Graceful landing spot for `photo:health|harmony|contrastmenu|contrastpair`
+  // buttons Telegram already delivered before the iOS-app pivot — without
+  // this, a tap on one of those old messages would just spin and time out.
   bot.on("callback_query:data", async (ctx, next) => {
-    const data = ctx.callbackQuery.data;
-    const [tag, action, payload] = data.split(":");
+    const [tag] = ctx.callbackQuery.data.split(":");
 
-    if (tag !== CALLBACK_PREFIX || !payload) {
+    if (tag !== CALLBACK_PREFIX) {
       await next();
       return;
     }
 
     await ctx.answerCallbackQuery();
-
-    if (action === "health") {
-      await runHealthCheck(ctx, payload.split(","));
-      return;
-    }
-
-    if (action === "harmony") {
-      await promptHarmonyTypes(ctx, payload);
-      return;
-    }
-
-    if (action === "contrastmenu") {
-      const hexes = payload.split(",");
-      await ctx.reply("Pick a pair to check:", { reply_markup: contrastPairKeyboard(hexes) });
-      return;
-    }
-
-    if (action === "contrastpair") {
-      const [fgHex, bgHex] = payload.split(",");
-      if (!fgHex || !bgHex) return;
-      const fgName = nameColor(...hexToRgb(fgHex));
-      const bgName = nameColor(...hexToRgb(bgHex));
-      const image = await renderContrastPairImage(fgHex, fgName, bgHex, bgName);
-
-      // Only offer Fix It when there's actually something to fix — a clean
-      // AA/AAA pass gets no button, matching the honest tone everywhere
-      // else in the bot rather than pushing Pro on a result that's fine.
-      const tone = verdictTone(evaluate(fgHex, bgHex).bestGrade);
-      const reply_markup = tone === "pass" ? undefined : new InlineKeyboard().text("Fix It", FIX_IT_CALLBACK);
-      await ctx.replyWithPhoto(new InputFile(image, "contrast-pair.png"), { reply_markup });
-    }
+    await sendWaitlistPrompt(ctx, "photo_followup");
   });
 }

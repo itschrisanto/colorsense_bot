@@ -4,7 +4,9 @@ import { MAIN_MENU } from "./menu.js";
 const WELCOME_TEXT = [
   "Hi, I'm Lauma — ColorSense's color assistant.",
   "",
-  "Tap a button below, or just type a command. I can build color schemes, score a palette, pull colors from a photo, or dig through the ColorSense library.",
+  "Send me a photo and I'll pull its dominant colors out as a named swatch, ready to use.",
+  "",
+  "Schemes, contrast checks, and everything else are moving to the ColorSense iOS app, launching soon.",
   "",
   "Type /faq for the full rundown.",
 ].join("\n");
