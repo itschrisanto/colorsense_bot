@@ -60,7 +60,7 @@ export function registerPhotoHandler(bot: Bot): void {
       const swatchImage = await renderPaletteImage(hexes);
       await ctx.replyWithPhoto(new InputFile(swatchImage, "palette.png"), {
         caption:
-          "Here's what I pulled from that. For schemes, contrast checks, and more, download the ColorSense iOS app.",
+          "Here's your palette. Want to take these colors further? Use the HEX codes above in the ColorSense iOS app to edit, check contrast, and save your palette.",
         reply_markup: appStoreKeyboard(),
       });
     } catch (err) {

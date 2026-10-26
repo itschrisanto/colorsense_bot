@@ -1,4 +1,5 @@
 import type { Bot, Context } from "grammy";
+import { appStoreKeyboard } from "../lib/waitlist.js";
 
 export const FAQ_TEXT = [
   "Here's what I can do.",
@@ -9,11 +10,11 @@ export const FAQ_TEXT = [
   "/feedback",
   "Something feel off, or have an idea? Tell me and I'll pass it along.",
   "",
-  "Schemes, contrast checks, palette scoring, and the ColorSense library are now in the iOS app — ask for one of those and I'll send you to its App Store page.",
+  "For schemes, contrast checks, palette scoring, and the ColorSense library, get the iOS app below.",
 ].join("\n");
 
 export async function sendFaq(ctx: Context): Promise<void> {
-  await ctx.reply(FAQ_TEXT);
+  await ctx.reply(FAQ_TEXT, { reply_markup: appStoreKeyboard() });
 }
 
 export function registerFaqCommand(bot: Bot): void {
