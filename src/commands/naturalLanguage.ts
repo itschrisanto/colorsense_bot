@@ -1,7 +1,7 @@
 import type { Bot, Context } from "grammy";
 import { isValidHex, normalizeHex } from "../lib/wcagContrast.js";
 import { getActivePalette } from "../lib/activePalette.js";
-import { sendWaitlistPrompt } from "../lib/waitlist.js";
+import { sendAppDownloadPrompt } from "../lib/waitlist.js";
 
 /**
  * Free, rule-based intent routing for plain text (no slash command). Runs
@@ -171,28 +171,28 @@ export async function dispatchIntent(ctx: Context, intent: Intent): Promise<void
       await ctx.reply("Send me the photo and I'll take it from there.");
       return;
     case "laumaNudge":
-      await sendWaitlistPrompt(ctx, "lauma_mention");
+      await sendAppDownloadPrompt(ctx, "lauma_mention");
       return;
     case "contrast":
-      await sendWaitlistPrompt(ctx, "contrast");
+      await sendAppDownloadPrompt(ctx, "contrast");
       return;
     case "trending":
-      await sendWaitlistPrompt(ctx, "trending");
+      await sendAppDownloadPrompt(ctx, "trending");
       return;
     case "search":
-      await sendWaitlistPrompt(ctx, "search");
+      await sendAppDownloadPrompt(ctx, "search");
       return;
     case "harmony":
-      await sendWaitlistPrompt(ctx, "harmony");
+      await sendAppDownloadPrompt(ctx, "harmony");
       return;
     case "health":
-      await sendWaitlistPrompt(ctx, "health");
+      await sendAppDownloadPrompt(ctx, "health");
       return;
     case "samplePalette":
-      await sendWaitlistPrompt(ctx, "sample_palette");
+      await sendAppDownloadPrompt(ctx, "sample_palette");
       return;
     case "svgRecolor":
-      await sendWaitlistPrompt(ctx, "svg_recolor_mention");
+      await sendAppDownloadPrompt(ctx, "svg_recolor_mention");
       return;
     case "unknown":
       await ctx.reply("Not sure I caught that — type /faq if you want the rundown of what I can do.");

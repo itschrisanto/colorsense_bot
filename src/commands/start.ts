@@ -6,7 +6,7 @@ const WELCOME_TEXT = [
   "",
   "Send me a photo and I'll pull its dominant colors out as a named swatch, ready to use.",
   "",
-  "Schemes, contrast checks, and everything else are moving to the ColorSense iOS app, launching soon.",
+  "For schemes, contrast checks, and everything else, download the ColorSense iOS app from the App Store.",
   "",
   "Type /faq for the full rundown.",
 ].join("\n");

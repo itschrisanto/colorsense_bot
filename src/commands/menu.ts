@@ -1,6 +1,6 @@
 import { Keyboard, type Bot } from "grammy";
 import { sendFaq } from "./faq.js";
-import { sendWaitlistPrompt } from "../lib/waitlist.js";
+import { sendAppDownloadPrompt } from "../lib/waitlist.js";
 
 export const MENU_LABELS = {
   photo: "Extract from Photo",
@@ -25,6 +25,6 @@ export function registerMenu(bot: Bot): void {
   bot.hears(MENU_LABELS.faq, sendFaq);
 
   bot.hears(RETIRED_LABELS, async (ctx) => {
-    await sendWaitlistPrompt(ctx, "menu_button");
+    await sendAppDownloadPrompt(ctx, "menu_button");
   });
 }

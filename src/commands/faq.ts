@@ -9,7 +9,7 @@ export const FAQ_TEXT = [
   "/feedback",
   "Something feel off, or have an idea? Tell me and I'll pass it along.",
   "",
-  "Schemes, contrast checks, palette scoring, and browsing the ColorSense library are moving to the ColorSense iOS app, launching soon — I'll point you to the waitlist if you ask for one of those.",
+  "Schemes, contrast checks, palette scoring, and the ColorSense library are now in the iOS app — ask for one of those and I'll send you to its App Store page.",
 ].join("\n");
 
 export async function sendFaq(ctx: Context): Promise<void> {

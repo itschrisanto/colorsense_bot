@@ -4,7 +4,7 @@ import { extractPalette } from "../lib/extractPalette.js";
 import { renderPaletteImage } from "../render/paletteImage.js";
 import { retry } from "../lib/retry.js";
 import { setActivePalette } from "../lib/activePalette.js";
-import { sendWaitlistPrompt, waitlistKeyboard } from "../lib/waitlist.js";
+import { appStoreKeyboard, sendAppDownloadPrompt } from "../lib/waitlist.js";
 
 const MAX_FILE_SIZE_BYTES = 15_000_000;
 const DOWNLOAD_ATTEMPTS = 3;
@@ -60,8 +60,8 @@ export function registerPhotoHandler(bot: Bot): void {
       const swatchImage = await renderPaletteImage(hexes);
       await ctx.replyWithPhoto(new InputFile(swatchImage, "palette.png"), {
         caption:
-          "Here's what I pulled from that. Schemes, contrast checks, and more are moving to the ColorSense iOS app.",
-        reply_markup: waitlistKeyboard(),
+          "Here's what I pulled from that. For schemes, contrast checks, and more, download the ColorSense iOS app.",
+        reply_markup: appStoreKeyboard(),
       });
     } catch (err) {
       console.error("Photo extraction failed:", err);
@@ -81,6 +81,6 @@ export function registerPhotoHandler(bot: Bot): void {
     }
 
     await ctx.answerCallbackQuery();
-    await sendWaitlistPrompt(ctx, "photo_followup");
+    await sendAppDownloadPrompt(ctx, "photo_followup");
   });
 }
